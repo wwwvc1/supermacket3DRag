@@ -1,0 +1,62 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: dianshanRag
+  datasource:
+    # 默认连接本地 MySQL，若需要使用不同密码请修改此处；测试环境已自动配置 H2 内存库保障零依赖自测
+    url: jdbc:mysql://localhost:3306/dianshan_rag?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:sql/schema.sql
+      data-locations: classpath:sql/data.sql
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ""
+      timeout: 3000ms
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: false
+  global-config:
+    db-config:
+      id-type: auto
+
+# Redisson 分布式锁配置
+redisson:
+  address: "redis://127.0.0.1:6379"
+  password: ""
+
+# JWT 鉴权配置
+jwt:
+  secret: "EnterpriseEcommerceRagKnowledgeBaseSecretKey2026SecureJwtToken1234567890!"
+  expiration: 86400000 # 24 小时 (毫秒)
+
+# AI 与 RAG 智能体配置
+rag:
+  llm:
+    provider: openai-compatible
+    base-url: "https://api.openai.com/v1"
+    api-key: "demo-api-key"
+    model-name: "gpt-4o-mini"
+  embedding:
+    # 动态切换: local (纯 Java 进程内 ONNX BGE-Small-ZH) 或 online (OpenAI 兼容接口)
+    provider: local
+    online:
+      base-url: "https://api.openai.com/v1"
+      api-key: "demo-api-key"
+      model-name: "text-embedding-3-small"
+  chroma:
+    host: "http://localhost:8000"
+    collection-name: "ecommerce_knowledge"
+    # 当 Chroma 未启动时自动降级为 InMemory 模式，确保无外部容器也能秒跑
+    fallback-to-in-memory: true

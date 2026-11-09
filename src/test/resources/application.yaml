@@ -1,0 +1,49 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: dianshanRag-test
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=USER
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:sql/schema.sql
+      data-locations: classpath:sql/data.sql
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ""
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+redisson:
+  address: "redis://127.0.0.1:6379"
+  password: ""
+
+jwt:
+  secret: "EnterpriseEcommerceRagKnowledgeBaseSecretKey2026SecureJwtToken1234567890!"
+  expiration: 86400000
+
+rag:
+  llm:
+    provider: openai-compatible
+    base-url: "https://api.openai.com/v1"
+    api-key: "demo-api-key"
+    model-name: "gpt-4o-mini"
+  embedding:
+    provider: local
+  chroma:
+    host: "http://localhost:8000"
+    collection-name: "ecommerce_knowledge_test"
+    fallback-to-in-memory: true
