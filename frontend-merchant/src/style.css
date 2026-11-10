@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 全局基础样式：浅色后台风格 */
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  background: #f5f7fa;
+  color: #303133;
+}
+
+/* 表格行闪烁高亮（WS 库存变动时） */
+.el-table .row-flash > td.el-table__cell {
+  animation: row-flash 1.6s ease-out;
+}
+
+@keyframes row-flash {
+  0% {
+    background-color: #fdf6ec;
+  }
+  30% {
+    background-color: #faecd8;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
