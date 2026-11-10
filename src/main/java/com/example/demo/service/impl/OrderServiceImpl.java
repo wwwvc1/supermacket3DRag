@@ -15,6 +15,7 @@ import com.example.demo.model.dto.OrderItemDTO;
 import com.example.demo.model.vo.OrderItemVO;
 import com.example.demo.model.vo.OrderVO;
 import com.example.demo.service.OrderService;
+import com.example.demo.websocket.SupermarketEventPublisher;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.slf4j.Logger;
@@ -32,7 +33,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 订单业务实现类 (集成 Redisson 分布式锁防商品超卖)
+ * 订单业务实现类 (集成 Redisson 分布式锁防商品超卖 & 3D 数字孪生超市库存实时联动)
  */
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -44,17 +45,20 @@ public class OrderServiceImpl implements OrderService {
     private final ProductMapper productMapper;
     private final RedissonClient redissonClient;
     private final StringRedisTemplate redisTemplate;
+    private final SupermarketEventPublisher eventPublisher;
 
     public OrderServiceImpl(OrderMapper orderMapper,
                             OrderItemMapper orderItemMapper,
                             ProductMapper productMapper,
                             RedissonClient redissonClient,
-                            StringRedisTemplate redisTemplate) {
+                            StringRedisTemplate redisTemplate,
+                            SupermarketEventPublisher eventPublisher) {
         this.orderMapper = orderMapper;
         this.orderItemMapper = orderItemMapper;
         this.productMapper = productMapper;
         this.redissonClient = redissonClient;
         this.redisTemplate = redisTemplate;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -70,6 +74,7 @@ public class OrderServiceImpl implements OrderService {
 
         List<RLock> acquiredLocks = new ArrayList<>();
         List<OrderItem> orderItemsToSave = new ArrayList<>();
+        List<long[]> deductedProducts = new ArrayList<>();
         BigDecimal totalAmount = BigDecimal.ZERO;
 
         try {
@@ -117,6 +122,9 @@ public class OrderServiceImpl implements OrderService {
                 // 主动清理该商品的 Redis 缓存，保证数据一致性
                 redisTemplate.delete(RedisConstants.PRODUCT_CACHE_PREFIX + product.getId());
 
+                int remainingStock = product.getStock() - itemDto.getQuantity();
+                deductedProducts.add(new long[]{product.getId(), remainingStock});
+
                 BigDecimal subtotal = product.getPrice().multiply(new BigDecimal(itemDto.getQuantity()));
                 totalAmount = totalAmount.add(subtotal);
 
@@ -148,6 +156,15 @@ public class OrderServiceImpl implements OrderService {
                         orderItem.getPrice(),
                         orderItem.getQuantity()
                 ));
+            }
+
+            // 3D 数字孪生超市库存实时变动广播与货架状态联动
+            for (long[] item : deductedProducts) {
+                try {
+                    eventPublisher.publishInventoryChanged(item[0], (int) item[1]);
+                } catch (Exception e) {
+                    log.warn("订单 [{}] 触发 3D 超市实时库存广播异常: {}", orderNo, e.getMessage());
+                }
             }
 
             log.info("用户 [{}] 成功下单，订单编号: [{}], 总金额: [{}]", userId, orderNo, totalAmount);

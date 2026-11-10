@@ -8,13 +8,9 @@ spring:
     # 默认连接本地 MySQL，若需要使用不同密码请修改此处；测试环境已自动配置 H2 内存库保障零依赖自测
     url: jdbc:mysql://localhost:3306/dianshan_rag?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
     username: root
-    password: root
+    password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
-  sql:
-    init:
-      mode: always
-      schema-locations: classpath:sql/schema.sql
-      data-locations: classpath:sql/data.sql
+
   data:
     redis:
       host: localhost
@@ -45,9 +41,9 @@ jwt:
 rag:
   llm:
     provider: openai-compatible
-    base-url: "https://api.openai.com/v1"
-    api-key: "demo-api-key"
-    model-name: "gpt-4o-mini"
+    base-url: "https://apihub.agnes-ai.com/v1"
+    api-key: "sk-IBcUKzTJUuTKAQRZaiAahs51YrfK4r7KBc3AYeCkft8xlHDr"
+    model-name: "agnes-3.0-flash"
   embedding:
     # 动态切换: local (纯 Java 进程内 ONNX BGE-Small-ZH) 或 online (OpenAI 兼容接口)
     provider: local

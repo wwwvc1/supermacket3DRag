@@ -1,4 +1,4 @@
--- 电商企业级 RAG 知识库智能体系统 - 数据库建表脚本 (兼容 MySQL 与 H2)
+-- 电商企业级 RAG 知识库智能体与 3D 数字孪生超市 - 数据库建表脚本 (兼容 MySQL 与 H2)
 
 -- 1. 用户表
 CREATE TABLE IF NOT EXISTS `user` (
@@ -10,19 +10,39 @@ CREATE TABLE IF NOT EXISTS `user` (
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. 商品表
+-- 2. 货架表 (3D 空间孪生，符合 Three.js 右手空间直角坐标系)
+CREATE TABLE IF NOT EXISTS `shelf` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `shelf_code` VARCHAR(32) NOT NULL UNIQUE,
+  `name` VARCHAR(128) NOT NULL,
+  `zone` VARCHAR(64) NOT NULL,
+  `position_x` DOUBLE NOT NULL DEFAULT 0.0,
+  `position_y` DOUBLE NOT NULL DEFAULT 0.0,
+  `position_z` DOUBLE NOT NULL DEFAULT 0.0,
+  `rotation_y` DOUBLE NOT NULL DEFAULT 0.0,
+  `camera_target_x` DOUBLE NOT NULL DEFAULT 0.0,
+  `camera_target_y` DOUBLE NOT NULL DEFAULT 1.5,
+  `camera_target_z` DOUBLE NOT NULL DEFAULT 2.0,
+  `status` VARCHAR(32) NOT NULL DEFAULT 'NORMAL',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. 商品表 (扩展关联 shelf_id 与 status 上下架状态)
 CREATE TABLE IF NOT EXISTS `product` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `shelf_id` BIGINT DEFAULT NULL,
   `name` VARCHAR(128) NOT NULL,
   `category` VARCHAR(64) NOT NULL,
   `price` DECIMAL(10,2) NOT NULL,
   `stock` INT NOT NULL DEFAULT 0,
+  `status` VARCHAR(32) NOT NULL DEFAULT 'ON_SHELF',
   `description` VARCHAR(1000) DEFAULT NULL,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. 购物车项表
+-- 4. 购物车项表
 CREATE TABLE IF NOT EXISTS `cart_item` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
   `user_id` BIGINT NOT NULL,
@@ -32,7 +52,7 @@ CREATE TABLE IF NOT EXISTS `cart_item` (
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4. 订单表
+-- 5. 订单主表
 CREATE TABLE IF NOT EXISTS `orders` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
   `order_no` VARCHAR(64) NOT NULL UNIQUE,
@@ -43,7 +63,7 @@ CREATE TABLE IF NOT EXISTS `orders` (
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 5. 订单明细项表
+-- 6. 订单明细项表
 CREATE TABLE IF NOT EXISTS `order_item` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
   `order_id` BIGINT NOT NULL,
@@ -53,7 +73,7 @@ CREATE TABLE IF NOT EXISTS `order_item` (
   `quantity` INT NOT NULL DEFAULT 1
 );
 
--- 6. 知识库文档记录表
+-- 7. 知识库文档记录表
 CREATE TABLE IF NOT EXISTS `knowledge_document` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
   `file_name` VARCHAR(255) NOT NULL,

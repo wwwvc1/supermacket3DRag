@@ -44,8 +44,8 @@ public class SecurityConfig {
                 .cors(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
-                        // 登录注册、商品浏览与知识库问答公开访问
-                        .requestMatchers("/api/auth/**", "/api/products/**", "/api/rag/**", "/error").permitAll()
+                        // 登录注册、商品浏览、知识库问答、3D场景全景与 WebSocket 端点公开访问
+                        .requestMatchers("/api/auth/**", "/api/products/**", "/api/rag/**", "/api/supermarket/**", "/ws/**", "/api/merchant/**", "/error").permitAll()
                         // 购物车与订单核心交易链路需要 JWT 鉴权
                         .anyRequest().authenticated()
                 )

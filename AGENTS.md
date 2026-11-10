@@ -1,4 +1,4 @@
-# AGENTS.md - 电商企业级 RAG 知识库智能体系统开发指南
+# AGENTS.md - 电商企业级 RAG 知识库与 3D 数字孪生超市系统开发指南
 
 本文档为参与本项目（`dianshanRag`）的所有 AI 智能体与开发人员提供统一的技术规范、架构准则和实施约束。所有代码修改、功能新增和重构均必须严格遵循本指南。
 
@@ -6,7 +6,9 @@
 
 ## 一、 项目背景与核心愿景
 
-本项目是一个面向电商企业的**高可靠、高并发、企业级 RAG 知识库智能体后端系统**（纯后端，无前端）。系统不仅涵盖完整的电商中台核心交易链路，还深度融合了以 **LangChain4j** 为核心引擎的私有知识库检索增强生成（RAG）与多轮会话智能体。
+本项目是一个面向电商企业的**高可靠、高并发、企业级 RAG 知识库智能体后端系统**，并在核心电商交易与私有知识库检索增强生成（RAG）的基础上，全面融合了面向 **3D 数字孪生超市（3D Digital Twin Supermarket）与 AI 导购机器人巡航（AI Shopping Guide Robot）** 的纯后端能力。
+
+系统不仅涵盖完整的电商中台核心交易链路（JWT、MyBatis-Plus、Redis 缓存防穿透/防雪崩、Redisson 分布式锁防超卖），还通过原生 WebSocket 驱动 3D 超市中货架售罄标红与实时库存变动刷新，并通过 LangChain4j 驱动 AI 导购机器人解析用户清单规划空间最优巡航路径。
 
 ---
 
@@ -20,11 +22,14 @@
 | **高并发与缓存** | **Redis 5 + Redisson 官方 Starter** | 1. **分布式锁**：必须使用 Redisson 可重入锁（`RLock`）实现商品库存扣减与防超卖；<br>2. **缓存防穿透**：查询空对象必须在 Redis 中缓存空值标记（短 TTL）；<br>3. **缓存防雪崩**：缓存过期时间必须叠加随机抖动值（Random Jitter）。 |
 | **安全体系** | **Spring Security + JWT** | 基于 `SecurityFilterChain` 的无状态过滤，Header 传递 `Authorization: Bearer <token>`，自动维护安全上下文。 |
 | **AI / RAG 引擎** | **LangChain4j (Java 统一生态)** | 统一对接 OpenAI 兼容格式大模型（支持 DeepSeek / Qwen / GPT / 本地 Ollama）。 |
-| **向量数据库** | **ChromaDB + 内存备用兜底** | 生产与常规开发使用 `ChromaEmbeddingStore`；同时配置支持降级为 `InMemoryEmbeddingStore`，确保无容器环境下本地自测秒级跑通。 |
-| **Embedding 策略** | **双引擎动态切换（工厂模式）** | 通过 `application.yaml` 配置属性一键切换：<br>1. **本地小模型**：JVM 进程内直接运行 ONNX 模型（如 `BGE-Small-ZH-ONNX`），零外部模型服务依赖；<br>2. **云端模型**：OpenAI 兼容 Embedding API。 |
+| **3D 空间孪生建模** | **Three.js / WebGL 标准空间坐标系** | 独立 `shelf` 货架实体表，三维世界坐标遵循右手系（Y 轴垂直朝上，X 轴横向，Z 轴纵深，以米为单位）；商品关联 `shelf_id`。 |
+| **实时通信广播** | **Spring 原生 WebSocket (`/ws/supermarket`)** | 无论用户下单扣减库存还是商户后台改库存，均向全场 3D 客户端广播 JSON 变动事件；商品售罄时货架联动标红。 |
+| **AI 导购机器人** | **清单意图识别 + 空间就近路径规划** | 智能体解析自由文本购物清单，匹配店内商品与 3D 坐标，按最近邻算法输出导购说明与结构化 3D 航路点序列（Waypoints）。 |
+| **商户后台体系** | **单门店极简管理端 (`/api/merchant/...`)** | 支持商户商品 CRUD、上下架切换（`ON_SHELF`/`OFF_SHELF`）、实时库存调控与货架点位维护。 |
+| **向量数据库** | **ChromaDB + 内存备用兜底** | 生产使用 `ChromaEmbeddingStore`；同时配置支持自动降级为 `InMemoryEmbeddingStore`，确保无容器环境下本地自测秒级跑通。 |
+| **Embedding 策略** | **双引擎动态切换（工厂模式）** | 通过 `application.yaml` 配置属性一键切换本地 JVM 内置 ONNX 模型与云端 OpenAI 兼容 API。 |
 | **文档与多模态** | **PDF / Word / Markdown / 本地 OCR** | 支持上传与解析 `.pdf`、`.docx`、`.md` 及图片文件（图片通过纯本地 OCR 提取文字与元数据入库）。 |
 | **溯源与智能体** | **精准来源引用 + 多轮记忆 + Tool** | 1. **多轮问答**：基于 `ChatMemory` 维护上下文；<br>2. **精准溯源**：回答必须在末尾标准化附带 `[引用1: 文件名 第X页/段落]` 溯源列表；<br>3. **业务联动**：智能体通过 `@Tool` 注解挂载电商商品实时查询能力。 |
-| **接口与测试** | **标准 RESTful + MockMvc 单元测试** | 遵循标准 HTTP 状态码与统一 JSON 包装；不引入 Swagger 等冗余文档依赖，编写完整的 Controller 单元测试覆盖核心链路。 |
 
 ---
 
@@ -42,14 +47,22 @@ src/main/java/com/example/demo/
 │   ├── SecurityConfig.java         # Spring Security 拦截规则与 Filter 配置
 │   ├── RedisConfig.java            # Redisson 与 RedisTemplate 配置
 │   ├── MyBatisPlusConfig.java      # MyBatis-Plus 分页插件等配置
-│   └── RagConfig.java              # LangChain4j、Chroma、Embedding 策略装配
+│   ├── RagConfig.java              # LangChain4j、Chroma、Embedding 策略装配
+│   └── WebSocketConfig.java        # 原生 WebSocket 端点与跨域配置
+├── websocket/                      # WebSocket 实时通信组件
+│   ├── SupermarketWebSocketHandler.java # 客户端连接池管理与消息通道
+│   └── SupermarketEventPublisher.java   # 库存变动与售罄标红广播发布器
 ├── controller/                     # MVC 控制器层（RESTful API）
 │   ├── AuthController.java         # 用户注册、登录、Token 刷新
 │   ├── ProductController.java      # 商品列表、详情（Redis 缓存/防穿透/防雪崩）
 │   ├── CartController.java         # 购物车增删改查
 │   ├── OrderController.java        # 下单结算（Redisson 分布式锁防超卖）
-│   └── RagController.java          # 文档上传、知识库检索、多轮对话智能体
-├── entity/                         # 数据库实体（对应 MySQL 表）
+│   ├── RagController.java          # 文档上传、知识库检索、多轮对话智能体
+│   ├── SupermarketSceneController.java  # 3D 场景初始化全景、空间商品搜索直飞
+│   ├── MerchantProductController.java   # 商户端商品 CRUD、上下架、库存调整
+│   ├── MerchantShelfController.java     # 商户端 3D 货架空间点位维护
+│   └── AiGuideController.java      # AI 导购机器人清单空间巡航规划
+├── entity/                         # 数据库实体（User, Product, Shelf, CartItem, Orders...）
 ├── mapper/                         # MyBatis-Plus Mapper 接口
 ├── model/                          # 数据传输模型
 │   ├── dto/                        # 接收请求入参 DTO
@@ -59,10 +72,13 @@ src/main/java/com/example/demo/
 │   ├── ProductService.java / impl/
 │   ├── CartService.java / impl/
 │   ├── OrderService.java / impl/
-│   └── rag/                        # RAG 专有业务与管道服务
+│   ├── merchant/MerchantService.java / impl/ # 商户管理业务
+│   ├── supermarket/SupermarketSceneService.java # 3D 空间组装与检索业务
+│   └── rag/                        # RAG 与智能体服务
 │       ├── DocumentParserService.java  # PDF/Word/MD/OCR 多源解析
 │       ├── EmbeddingStrategyFactory.java # 本地/云端 Embedding 动态工厂
-│       ├── RagAgentService.java        # 智能体问答、多轮记忆与溯源组装
+│       ├── RagAgentService.java        # 知识库问答、多轮记忆与溯源组装
+│       ├── AiGuideAgentService.java    # AI 导购机器人清单寻路规划引擎
 │       └── tool/EcommerceTools.java    # 挂载供智能体调用的商品查询工具
 └── security/                       # 安全过滤器与上下文
     └── JwtAuthenticationFilter.java
@@ -72,29 +88,53 @@ src/main/java/com/example/demo/
 
 ## 四、 核心设计模式与技术落地要点
 
-### 1. Redis 5 并发控制与缓存保护
-- **Redisson 分布式锁**：
-  - 锁粒度：`lock:order:product:{productId}`
-  - 获取锁超时设定：`tryLock(5, 10, TimeUnit.SECONDS)`
-  - 核心场景：下单扣减商品库存时加锁，事务提交后安全释放锁，严防高并发超卖。
-- **缓存防穿透**：
-  - 查询商品若数据库不存在，向 Redis 写入空值占位符（如 `NULL_OBJECT`），并设置较短 TTL（如 60 秒）。
-- **缓存防雪崩**：
-  - 商品正常缓存基准 TTL（如 1 小时），写入时附加随机抖动时间（如 `ThreadLocalRandom.current().nextInt(0, 300)` 秒）。
+### 1. 3D 空间孪生货架与动态标红机制
+- 货架坐标存储结构：`position: {x, y, z}`, `cameraTarget: {x, y, z}`, `rotationY`, `zone`。
+- 联动逻辑：当货架上所有陈列商品的 `stock` 均降为 0 或下架时，货架状态置为 `OUT_OF_STOCK`。前端 3D 场景接收到 WebSocket 事件后将货架网格模型着色为警示红。
 
-### 2. 双 Embedding 策略动态工厂
-- 定义统一的 `EmbeddingModel` 接口。
-- 根据配置文件 `rag.embedding.provider` 的值（`local` 或 `online`）：
-  - `local`：初始化 LangChain4j 进程内 ONNX 模型（如 `BgeSmallZhEmbeddingModel`），免外部调用；
-  - `online`：初始化 `OpenAiEmbeddingModel`，对接兼容 API；
-- 实现运行时动态解耦，对上层 `ContentRetriever` 和向量持久化透明。
+### 2. WebSocket 实时事件驱动设计
+- 端点：`ws://localhost:8080/ws/supermarket`。
+- 广播场景：
+  - 用户下单扣减库存（Redisson 锁保护成功后）；
+  - 商户后台快速修改库存（`PUT /api/merchant/products/{id}/stock`）；
+  - 商户后台修改商品上下架（`PUT /api/merchant/products/{id}/status`）。
+- 广播报文结构：
+  ```json
+  {
+    "event": "INVENTORY_CHANGED",
+    "productId": 1,
+    "productName": "纯牛奶",
+    "shelfId": 2,
+    "shelfCode": "A02",
+    "stock": 0,
+    "isOutOfStock": true,
+    "timestamp": 1731234567890
+  }
+  ```
 
-### 3. 多源文档解析与多轮溯源
-- 解析流程：用户上传文件 -> 根据后缀路由解析器（PDFBox / POI / MD / OCR） -> 文本切分器（`DocumentSplitters.recursive(300, 30)`） -> 附带元数据（`source_file`, `page_number`, `chunk_id`） -> 向量化入库 Chroma。
-- 问答流程：用户提问 -> 结合 `ChatMemory` 读取历史上下文 -> Retriever 检索相关 TextSegment -> 提取 Metadata -> 拼接 Prompt -> LLM 生成回答 -> 附带格式化引用列表：
-  ```text
-  [引用1] 用户手册.pdf (第2页, 相似度: 0.89)
-  [引用2] 售后政策.docx (段落3, 相似度: 0.85)
+### 3. AI 导购机器人与最优巡航算法
+- 意图提取：大模型解析用户清单中的商品词汇；
+- 候选匹配：通过商品数据库与向量模型匹配店内在售商品；
+- 空间拓扑排序：以起点 `(0, 1.5, 0)` 出发，按最近邻欧氏距离排序货架三维坐标，输出结构化 3D 巡航航路点数组：
+  ```json
+  {
+    "summary": "为您规划了前往生鲜区与冷藏区的最优路线...",
+    "waypoints": [
+      {
+        "step": 1,
+        "product": { "id": 1, "name": "红富士苹果", "price": 8.5, "stock": 50 },
+        "shelf": {
+          "code": "A01",
+          "name": "生鲜果蔬货架",
+          "zone": "生鲜区",
+          "position": { "x": -5.0, "y": 0.0, "z": -10.0 },
+          "cameraTarget": { "x": -5.0, "y": 1.5, "z": -8.0 }
+        },
+        "isOutOfStock": false
+      }
+    ],
+    "unmatchedItems": []
+  }
   ```
 
 ---
@@ -102,6 +142,6 @@ src/main/java/com/example/demo/
 ## 五、 智能体协作与代码修改规则
 
 1. **坚持测试驱动与自测验证**：新增或修改功能时，必须保证 `mvn clean test` 编译与测试通过。
-2. **严禁破坏文档注释**：所有类、公共方法、复杂算法（如分布式锁、切片逻辑）必须保留完整中文注释。
-3. **保持轻量与单一职责**：不要引入未经批准的额外重型框架（如额外引入复杂 Python 环境或重量级微服务组件）。
+2. **严禁破坏文档注释**：所有类、公共方法、复杂算法（如分布式锁、切片逻辑、空间路径规划）必须保留完整中文注释。
+3. **保持轻量与单一职责**：不要引入未经批准的额外重型框架。
 4. **提交与交付准则**：代码交付时，需同步校验 PRD 需求清单与 HOW_TO_TEST 操作手册的对齐情况。
