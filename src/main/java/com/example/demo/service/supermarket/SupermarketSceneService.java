@@ -80,25 +80,25 @@ public class SupermarketSceneService {
             shelfVOList.add(vo);
         }
 
-        // 默认相机 Spawn 初始注视点 (站在超市门口俯瞰全局)
+        // 默认相机 Spawn 初始注视点 (站在商业步行街入口漫游视点，向大道纵深望去)
         Map<String, Double> initialCamera = new HashMap<>();
         initialCamera.put("spawnX", 0.0);
-        initialCamera.put("spawnY", 3.0);
-        initialCamera.put("spawnZ", 8.0);
+        initialCamera.put("spawnY", 2.2);
+        initialCamera.put("spawnZ", 22.0);
         initialCamera.put("lookAtX", 0.0);
-        initialCamera.put("lookAtY", 1.0);
+        initialCamera.put("lookAtY", 1.6);
         initialCamera.put("lookAtZ", 0.0);
 
-        // 空间边界设定 (长宽高范围)
+        // 空间边界设定 (长宽高范围，商业街区宽 48m, 长 64m)
         Map<String, Double> sceneBounds = new HashMap<>();
-        sceneBounds.put("minX", -20.0);
-        sceneBounds.put("maxX", 20.0);
-        sceneBounds.put("minZ", -25.0);
-        sceneBounds.put("maxZ", 15.0);
-        sceneBounds.put("height", 6.0);
+        sceneBounds.put("minX", -24.0);
+        sceneBounds.put("maxX", 24.0);
+        sceneBounds.put("minZ", -36.0);
+        sceneBounds.put("maxZ", 28.0);
+        sceneBounds.put("height", 8.0);
 
         return new SupermarketSceneVO(
-                "3D 数字孪生未来智慧超市",
+                "3D 数字孪生未来智慧商业街",
                 shelfVOList.size(),
                 initialCamera,
                 sceneBounds,

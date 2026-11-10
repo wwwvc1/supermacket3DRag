@@ -5,16 +5,16 @@ INSERT INTO `user` (`id`, `username`, `password`, `phone`) VALUES
 (1, 'testuser', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '13800138000')
 ON DUPLICATE KEY UPDATE `username`=`username`;
 
--- 初始 3D 数字孪生超市货架 (Three.js 右手空间直角坐标，以米为单位)
+-- 初始 3D 数字孪生商业街独立店铺货架 (Three.js 右手空间直角坐标，沿街两侧分布，以米为单位)
 INSERT INTO `shelf` (`id`, `shelf_code`, `name`, `zone`, `position_x`, `position_y`, `position_z`, `rotation_y`, `camera_target_x`, `camera_target_y`, `camera_target_z`, `status`) VALUES
-(1, 'A01', '生鲜果蔬冷藏货架', '生鲜果蔬区', -6.0, 0.0, -8.0, 0.0, -6.0, 1.5, -6.0, 'NORMAL'),
-(2, 'B01', '旗舰数码影音展台', '数码影音区', -2.0, 0.0, -10.0, 0.0, -2.0, 1.5, -8.0, 'NORMAL'),
-(3, 'C01', '潮流客制化电竞外设架', '电脑外设区', 3.0, 0.0, -10.0, 0.0, 3.0, 1.5, -8.0, 'NORMAL'),
-(4, 'D01', '智能穿戴与健康体验台', '智能穿戴区', 7.0, 0.0, -8.0, 0.0, 7.0, 1.5, -6.0, 'NORMAL'),
-(5, 'E01', '高端显示与办公主机区', '电脑办公区', -5.0, 0.0, -3.0, 0.0, -5.0, 1.5, -1.0, 'NORMAL'),
-(6, 'F01', '苹果旗舰智能手机展柜', '手机数码区', 0.0, 0.0, -3.0, 0.0, 0.0, 1.5, -1.0, 'NORMAL'),
-(7, 'G01', '有机乳品与低温冷饮柜', '乳品冷饮区', 5.0, 0.0, -3.0, 0.0, 5.0, 1.5, -1.0, 'NORMAL')
-ON DUPLICATE KEY UPDATE `name`=`name`;
+(1, 'A01', '源头直采 · 鲜果果蔬市集', '生鲜果蔬区', 12.0, 0.0, 10.0, 0.0, 9.5, 1.6, 10.0, 'NORMAL'),
+(2, 'B01', 'Sony 索尼声学 · 旗舰影音店', '数码影音区', -12.0, 0.0, -3.0, 0.0, -9.5, 1.6, -3.0, 'NORMAL'),
+(3, 'C01', 'ROG 玩家极客 · 电竞外设馆', '电脑外设区', -12.0, 0.0, -16.0, 0.0, -9.5, 1.6, -16.0, 'NORMAL'),
+(4, 'D01', 'iWatch · 智能穿戴与健康生活馆', '智能穿戴区', 12.0, 0.0, -16.0, 0.0, 9.5, 1.6, -16.0, 'NORMAL'),
+(5, 'E01', 'UltraVision · 高端电竞超显中心', '电脑办公区', 0.0, 0.0, -28.0, 0.0, 0.0, 1.6, -25.0, 'NORMAL'),
+(6, 'F01', 'Apple 旗舰店 · 手机数码馆', '手机数码区', -12.0, 0.0, 10.0, 0.0, -9.5, 1.6, 10.0, 'NORMAL'),
+(7, 'G01', '特仑苏 · 有机乳品与低温冷饮吧', '乳品冷饮区', 12.0, 0.0, -3.0, 0.0, 9.5, 1.6, -3.0, 'NORMAL')
+ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `position_x`=VALUES(`position_x`), `position_z`=VALUES(`position_z`);
 
 -- 初始商品数据 (绑定对应 3D 货架)
 INSERT INTO `product` (`id`, `shelf_id`, `name`, `category`, `price`, `stock`, `status`, `description`) VALUES

@@ -1,9 +1,8 @@
 /**
  * 后处理特效管线 (Post-Processing Pipeline)：
- * 1. RenderPass：主场景渲染
- * 2. UnrealBloomPass：高光/LED灯带/售罄红光泛光光晕
- * 3. OutputPass：ACES 电影级色调映射与色彩管理
- * 4. 支持高质量/性能模式一键切换
+ * 1. RenderPass：主场景高保真渲染
+ * 2. UnrealBloomPass：高光/霓虹招牌/LED灯带/售罄红光精准泛光 (阈值 1.05，杜绝普通地面/墙面反光泛白起雾)
+ * 3. OutputPass：ACES 电影级色彩管理与动态对比
  */
 import * as THREE from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
@@ -32,11 +31,12 @@ export class PostProcessing {
     this.composer.addPass(this.renderPass)
 
     // 2. 选择性柔和辉光通道 (Bloom)
+    // 关键参数调整：threshold 设为 1.05，仅发光材质生效，防止地面和墙壁起雾！
     this.bloomPass = new UnrealBloomPass(
       new THREE.Vector2(size.x, size.y),
-      0.45,
-      0.5,
-      0.85
+      0.45, // strength
+      0.35, // radius
+      1.05  // threshold
     )
     this.composer.addPass(this.bloomPass)
 

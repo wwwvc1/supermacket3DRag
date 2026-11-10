@@ -17,6 +17,7 @@ import LoginModal from './components/LoginModal.vue'
 import AiGuideModal from './components/AiGuideModal.vue'
 import AiGuideCruiseBar from './components/AiGuideCruiseBar.vue'
 import RagChatModal from './components/RagChatModal.vue'
+import MerchantQuickDrawer from './components/MerchantQuickDrawer.vue'
 import ToastHost from './components/ToastHost.vue'
 
 const canvasContainer = ref<HTMLDivElement | null>(null)
@@ -31,6 +32,7 @@ const fps = ref(60)
 // 弹窗状态
 const guideModalVisible = ref(false)
 const ragModalVisible = ref(false)
+const merchantDrawerVisible = ref(false)
 const activeRoute = ref<GuideRoute | null>(null)
 
 onMounted(async () => {
@@ -99,6 +101,7 @@ function handleCloseRoute() {
       :fps="fps"
       @open-guide="guideModalVisible = true"
       @open-rag="ragModalVisible = true"
+      @open-merchant="merchantDrawerVisible = true"
       @toggle-mode="handleToggleMode"
     />
 
@@ -113,6 +116,12 @@ function handleCloseRoute() {
 
     <!-- 购物车抽屉 -->
     <CartDrawer />
+
+    <!-- 商家快捷管理抽屉 -->
+    <MerchantQuickDrawer
+      :visible="merchantDrawerVisible"
+      @close="merchantDrawerVisible = false"
+    />
 
     <!-- 登录注册弹窗 -->
     <LoginModal />

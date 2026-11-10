@@ -125,6 +125,11 @@ export class SupermarketWorld {
     this.productInstancer.updateStock(productId, stock)
   }
 
+  /** 选中商品触发悬浮 360 度自转展示 */
+  selectProduct(productId: number | null) {
+    this.productInstancer.selectProduct(productId)
+  }
+
   /** 实时更新货架售罄标红状态 */
   setShelfStatus(shelfId: number, status: ShelfStatus) {
     this.shelfManager.setShelfStatus(shelfId, status)
@@ -193,9 +198,10 @@ export class SupermarketWorld {
       const delta = this.clock.getDelta()
       const elapsed = this.clock.getElapsedTime()
 
-      // 更新控制器与材质呼吸灯
+      // 更新控制器、货架呼吸灯与选中商品悬浮旋转
       this.cameraController.update(delta)
       this.shelfManager.update(elapsed)
+      this.productInstancer.update(delta, elapsed)
 
       // 后处理通道渲染
       this.postProcessing.render()

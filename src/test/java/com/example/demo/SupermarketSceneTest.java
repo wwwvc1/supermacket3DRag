@@ -36,21 +36,21 @@ class SupermarketSceneTest {
 
         SupermarketSceneVO scene = result.getData();
         assertNotNull(scene);
-        assertTrue(scene.getStoreName().contains("智慧超市"));
+        assertTrue(scene.getStoreName().contains("智慧"));
         assertNotNull(scene.getTotalShelves());
         assertTrue(scene.getTotalShelves() >= 7);
 
         // 校验空间边界
         assertNotNull(scene.getSceneBounds());
-        assertEquals(-20.0, scene.getSceneBounds().get("minX"));
-        assertEquals(20.0, scene.getSceneBounds().get("maxX"));
-        assertEquals(6.0, scene.getSceneBounds().get("height"));
+        assertEquals(-24.0, scene.getSceneBounds().get("minX"));
+        assertEquals(24.0, scene.getSceneBounds().get("maxX"));
+        assertEquals(8.0, scene.getSceneBounds().get("height"));
 
         // 校验默认漫游相机起点与朝向
         assertNotNull(scene.getInitialCamera());
         assertEquals(0.0, scene.getInitialCamera().get("spawnX"));
-        assertEquals(3.0, scene.getInitialCamera().get("spawnY"));
-        assertEquals(8.0, scene.getInitialCamera().get("spawnZ"));
+        assertEquals(2.2, scene.getInitialCamera().get("spawnY"));
+        assertEquals(22.0, scene.getInitialCamera().get("spawnZ"));
 
         // 校验货架列表
         List<SceneShelfVO> shelves = scene.getShelves();

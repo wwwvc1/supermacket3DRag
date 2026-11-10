@@ -20,6 +20,7 @@ import {
   VolumeX,
   Compass,
   Eye,
+  Store,
 } from 'lucide-vue-next'
 import { searchSpatial } from '../api/supermarket'
 import type { ProductSpatial } from '../types/api'
@@ -38,6 +39,7 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'openGuide'): void
   (e: 'openRag'): void
+  (e: 'openMerchant'): void
   (e: 'toggleMode'): void
 }>()
 
@@ -220,6 +222,16 @@ function toggleMute() {
       >
         <MessageSquare class="w-3.5 h-3.5 text-amber-400" />
         <span>知识库客服</span>
+      </button>
+
+      <!-- 商家管理后台入口 -->
+      <button
+        class="px-2.5 h-8 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 border border-emerald-500/60 text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition active:scale-95 text-white"
+        title="打开商家后台管理 (调库存/上下架/查看点位)"
+        @click="emit('openMerchant')"
+      >
+        <Store class="w-3.5 h-3.5" />
+        <span>商家后台</span>
       </button>
 
       <!-- 购物车 -->

@@ -1,8 +1,8 @@
 /**
  * 三态相机控制器：
- * 1. 上帝俯瞰全景模式 (OrbitControls)：俯视自由旋转/缩放，带地下防穿透限制
- * 2. 第一人称漫游模式 (FPS Roaming)：成人视高 (Y=1.6m)，WASD + Shift 奔跑位移，带射线碰撞检测防穿墙
- * 3. 电影级平滑运镜模式 (Flight Mode)：基于 GSAP 贝塞尔补间，在货架特写与全景之间丝滑飞跃
+ * 1. 上帝俯瞰全景模式 (OrbitControls)：俯视自由旋转/缩放，按 WASD 平移漫游整条商业街
+ * 2. 第一人称漫游模式 (FPS Roaming)：成人视高 (Y=1.6m)，WASD + Shift 行走奔跑，按住右键/指针锁定环顾四周，带射线防穿墙
+ * 3. 电影级平滑运镜模式 (Flight Mode)：基于 GSAP 贝塞尔补间，在街区店铺特写与全景之间丝滑飞跃
  */
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -19,7 +19,7 @@ export class CameraController {
   orbitControls: OrbitControls
   private activeTween: gsap.core.Tween | null = null
 
-  // 第一人称控制状态
+  // 键盘位移状态
   private keys = { forward: false, backward: false, left: false, right: false, shift: false }
   private eyeHeight = 1.6
   private isPointerLocked = false
@@ -38,11 +38,11 @@ export class CameraController {
     this.orbitControls.enableDamping = true
     this.orbitControls.dampingFactor = 0.05
     this.orbitControls.minDistance = 2.0
-    this.orbitControls.maxDistance = 35.0
+    this.orbitControls.maxDistance = 50.0
     this.orbitControls.maxPolarAngle = Math.PI / 2 - 0.05 // 防穿入地下
-    this.orbitControls.target.set(0, 1.0, 0)
+    this.orbitControls.target.set(0, 1.5, 0)
 
-    this.setupFPSListeners()
+    this.setupListeners()
   }
 
   /** 设置初始机位与视线注视点 */
@@ -67,6 +67,7 @@ export class CameraController {
     this.mode = 'fps'
     this.orbitControls.enabled = false
     this.camera.position.y = this.eyeHeight
+    this.euler.setFromQuaternion(this.camera.quaternion)
     this.callbacks?.onModeChanged?.('fps')
   }
 
@@ -127,10 +128,11 @@ export class CameraController {
     })
   }
 
-  /** 绑定键盘与第一人称指针锁定事件 */
-  private setupFPSListeners() {
+  /** 绑定键盘与指针交互事件 */
+  private setupListeners() {
     window.addEventListener('keydown', (e) => {
-      if (this.mode !== 'fps') return
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+
       switch (e.code) {
         case 'KeyW':
         case 'ArrowUp':
@@ -183,17 +185,16 @@ export class CameraController {
       }
     })
 
-    // 第一人称鼠标视角旋转
+    // 第一人称鼠标视角旋转 (按住右键或进入指针锁定)
     this.domElement.addEventListener('mousemove', (e) => {
       if (this.mode !== 'fps') return
-      // 如果按住鼠标右键或已进入指针锁定
-      if (e.buttons === 2 || this.isPointerLocked) {
+      if (e.buttons === 2 || e.buttons === 1 || this.isPointerLocked) {
         const movementX = e.movementX || 0
         const movementY = e.movementY || 0
 
         this.euler.setFromQuaternion(this.camera.quaternion)
-        this.euler.y -= movementX * 0.0025
-        this.euler.x -= movementY * 0.0025
+        this.euler.y -= movementX * 0.0028
+        this.euler.x -= movementY * 0.0028
         this.euler.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.euler.x))
         this.camera.quaternion.setFromEuler(this.euler)
       }
@@ -204,20 +205,47 @@ export class CameraController {
     })
   }
 
-  /** 帧更新：Orbit 阻尼与 FPS 碰撞位移计算 */
+  /** 帧更新：Orbit 平移/阻尼与 FPS 沉浸式漫游位移计算 */
   update(delta: number) {
+    if (this.mode === 'flight') {
+      return
+    }
+
+    const speed = this.keys.shift ? 10.0 : 4.5
+    const hasMoveInput = this.keys.forward || this.keys.backward || this.keys.left || this.keys.right
+
+    // === 上帝全景模式下 WASD 平移漫游 ===
     if (this.mode === 'orbit') {
+      if (hasMoveInput) {
+        // 计算沿镜头当前水平视线的前进与右向向量
+        const forward = new THREE.Vector3().subVectors(this.orbitControls.target, this.camera.position)
+        forward.y = 0
+        if (forward.lengthSq() < 0.0001) {
+          forward.set(0, 0, -1)
+        }
+        forward.normalize()
+
+        const right = new THREE.Vector3().crossVectors(forward, this.camera.up).normalize()
+
+        const moveDir = new THREE.Vector3()
+        if (this.keys.forward) moveDir.add(forward)
+        if (this.keys.backward) moveDir.sub(forward)
+        if (this.keys.right) moveDir.add(right)
+        if (this.keys.left) moveDir.sub(right)
+
+        if (moveDir.lengthSq() > 0) {
+          moveDir.normalize().multiplyScalar(speed * delta)
+          this.camera.position.add(moveDir)
+          this.orbitControls.target.add(moveDir)
+        }
+      }
       this.orbitControls.update()
       return
     }
 
+    // === 第一人称沉浸漫游模式 ===
     if (this.mode === 'fps') {
-      const speed = this.keys.shift ? 6.0 : 3.2
-      const moveZ = Number(this.keys.forward) - Number(this.keys.backward)
-      const moveX = Number(this.keys.right) - Number(this.keys.left)
-
-      const dir = new THREE.Vector3()
-      if (moveZ !== 0 || moveX !== 0) {
+      if (hasMoveInput) {
         const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion)
         forward.y = 0
         forward.normalize()
@@ -226,19 +254,25 @@ export class CameraController {
         right.y = 0
         right.normalize()
 
-        dir.addScaledVector(forward, moveZ)
-        dir.addScaledVector(right, moveX)
-        dir.normalize()
+        const moveDir = new THREE.Vector3()
+        if (this.keys.forward) moveDir.add(forward)
+        if (this.keys.backward) moveDir.sub(forward)
+        if (this.keys.right) moveDir.add(right)
+        if (this.keys.left) moveDir.sub(right)
 
-        // 防穿墙/防穿货架检测：沿移动方向发射水平射线
-        const rayStart = this.camera.position.clone()
-        rayStart.y = 0.8
-        this.raycaster.set(rayStart, dir)
-        const hits = this.raycaster.intersectObjects(this.colliders, true)
+        if (moveDir.lengthSq() > 0) {
+          moveDir.normalize()
 
-        const dist = speed * delta
-        if (hits.length === 0 || hits[0].distance > 0.6) {
-          this.camera.position.addScaledVector(dir, dist)
+          // 射线碰撞检测防穿墙/货架
+          const rayStart = this.camera.position.clone()
+          rayStart.y = 0.8
+          this.raycaster.set(rayStart, moveDir)
+          const hits = this.raycaster.intersectObjects(this.colliders, true)
+
+          const dist = speed * delta
+          if (hits.length === 0 || hits[0].distance > 0.65) {
+            this.camera.position.addScaledVector(moveDir, dist)
+          }
         }
       }
 
