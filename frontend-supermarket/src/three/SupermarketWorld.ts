@@ -1,6 +1,6 @@
 /**
- * 3D 数字孪生超市世界总控制器 (SupermarketWorld)
- * 聚合渲染循环、硬装搭建、货架摆放、商品陈列、相机控制、后处理光影与交互拾取
+ * 3D 数字孪生超市世界总控制器 (SupermarketWorld.ts)
+ * 聚合渲染循环、步行街硬装搭建、商铺独立建筑、货架摆放、商品陈列、相机控制、后处理光影与交互拾取
  */
 import * as THREE from 'three'
 import type { ShelfStatus, SupermarketScene } from '../types/api'
@@ -9,11 +9,12 @@ import { ShelfManager } from './ShelfManager'
 import { ProductInstancer } from './ProductInstancer'
 import { CameraController, type CameraMode } from './CameraController'
 import { PostProcessing } from './PostProcessing'
-import { InteractionManager } from './InteractionManager'
+import { InteractionManager, type ShopUserData } from './InteractionManager'
 import { setWorld } from './worldRef'
 
 export interface WorldCallbacks {
   onProductSelected?: (productId: number) => void
+  onShopSelected?: (shelfId: number) => void
   onModeChanged?: (mode: CameraMode) => void
   onFpsUpdated?: (fps: number) => void
 }
@@ -48,8 +49,8 @@ export class SupermarketWorld {
 
     // 1. 场景与相机
     this.scene = new THREE.Scene()
-    this.camera = new THREE.PerspectiveCamera(55, width / height, 0.1, 100)
-    this.camera.position.set(0, 3.0, 8.0)
+    this.camera = new THREE.PerspectiveCamera(55, width / height, 0.1, 120)
+    this.camera.position.set(0, 3.0, 16.0)
 
     // 2. 电影级写实渲染器 (ACESFilmic 色彩映射 + PCFSoft 柔和阴影)
     this.renderer = new THREE.WebGLRenderer({
@@ -81,8 +82,10 @@ export class SupermarketWorld {
       this.renderer.domElement,
       this.camera,
       this.productInstancer.pickables,
+      this.sceneBuilder.shopPickables,
       {
         onProductClick: (id) => this.callbacks?.onProductSelected?.(id),
+        onShopClick: (shop) => this.handleShopClick(shop),
       }
     )
 
@@ -98,13 +101,13 @@ export class SupermarketWorld {
 
   /** 加载后端下发的完整场景全景树 */
   loadSceneData(data: SupermarketScene) {
-    // 1. 生成硬装
+    // 1. 生成街区与 7 座独立商铺建筑硬装
     this.sceneBuilder.build(data.sceneBounds)
 
-    // 2. 摆放货架
+    // 2. 摆放店内货架与展台
     this.shelfManager.buildShelves(data.shelves)
 
-    // 3. 摆放商品
+    // 3. 摆放展台上各商户商品
     this.productInstancer.populate(data.shelves)
 
     // 4. 更新碰撞体与交互拾取目标
@@ -112,12 +115,20 @@ export class SupermarketWorld {
       ...this.sceneBuilder.colliders,
       ...this.shelfManager.colliders,
     ]
-    this.interactionManager.updatePickables(this.productInstancer.pickables)
+    this.interactionManager.updatePickables(
+      this.productInstancer.pickables,
+      this.sceneBuilder.shopPickables
+    )
 
-    // 5. 设置初始机位
+    // 5. 设置街区入口初始机位
     if (data.initialCamera) {
       this.cameraController.setSpawn(data.initialCamera)
     }
+  }
+
+  /** 响应点击商铺事件，运镜直飞入店内 */
+  handleShopClick(shop: ShopUserData) {
+    this.flyToShop(shop.shelfId)
   }
 
   /** 实时更新商品库存 */
@@ -135,24 +146,53 @@ export class SupermarketWorld {
     this.shelfManager.setShelfStatus(shelfId, status)
   }
 
-  /** 飞向指定货架特写视角 */
-  flyToShelf(shelfId: number, onComplete?: () => void) {
+  /** 飞入指定店铺内部展台视角 (点击店铺或在店内导览时触发) */
+  flyToShop(shelfId: number, onComplete?: () => void) {
     const inst = this.shelfManager.shelves.get(shelfId)
     if (!inst) return
     const s = inst.data
 
-    const camPos = {
-      x: s.cameraTargetX ?? s.positionX,
-      y: s.cameraTargetY ?? 1.5,
-      z: s.cameraTargetZ ?? s.positionZ + 2,
-    }
-    const lookAt = {
-      x: s.positionX,
-      y: s.positionY + 1.0,
-      z: s.positionZ,
+    let camPos: { x: number; y: number; z: number }
+    let lookAt: { x: number; y: number; z: number }
+
+    if (s.positionX < -5) {
+      // 西侧商铺 (Apple, Sony, ROG)：机位在门口东侧面向西边展台
+      camPos = { x: -9.2, y: 1.6, z: s.positionZ }
+      lookAt = { x: s.positionX, y: 1.1, z: s.positionZ }
+    } else if (s.positionX > 5) {
+      // 东侧商铺 (生鲜, 特仑苏, iWatch)：机位在门口西侧面向东边展台
+      camPos = { x: 9.2, y: 1.6, z: s.positionZ }
+      lookAt = { x: s.positionX, y: 1.1, z: s.positionZ }
+    } else {
+      // 街尾旗舰店 (UltraVision)：机位在大门南侧面向北边展台
+      camPos = { x: 0.0, y: 1.6, z: -24.5 }
+      lookAt = { x: 0.0, y: 1.2, z: s.positionZ }
     }
 
+    this.cameraController.flyTo(camPos, lookAt, 1.5, () => {
+      this.callbacks?.onShopSelected?.(shelfId)
+      onComplete?.()
+    })
+  }
+
+  /** 走出店铺，平滑运镜回到中央商业步行街 */
+  flyToStreet(shelfId?: number, onComplete?: () => void) {
+    let targetZ = 8.0
+    if (shelfId) {
+      const inst = this.shelfManager.shelves.get(shelfId)
+      if (inst) {
+        targetZ = Math.min(Math.max(inst.data.positionZ + 4.0, -22), 22)
+      }
+    }
+    const camPos = { x: 0.0, y: 2.2, z: targetZ }
+    const lookAt = { x: 0.0, y: 1.5, z: targetZ - 10.0 }
+
     this.cameraController.flyTo(camPos, lookAt, 1.5, onComplete)
+  }
+
+  /** 飞向指定货架特写视角 */
+  flyToShelf(shelfId: number, onComplete?: () => void) {
+    this.flyToShop(shelfId, onComplete)
   }
 
   /** 按绝对三维点位平滑运镜飞掠 */

@@ -76,7 +76,24 @@ export class ShelfManager {
     root.rotation.y = shelf.rotationY || 0
 
     const isFridge = shelf.zone.includes('冷饮') || shelf.zone.includes('生鲜')
-    const isTable = shelf.zone.includes('数码') || shelf.zone.includes('外设') || shelf.zone.includes('穿戴')
+    const isTable =
+      shelf.zone.includes('数码') ||
+      shelf.zone.includes('外设') ||
+      shelf.zone.includes('穿戴') ||
+      shelf.zone.includes('电竞') ||
+      shelf.zone.includes('影音') ||
+      shelf.zone.includes('办公')
+
+    // 展台朝向自动对齐门店大门迎客方向
+    const rotY =
+      shelf.rotationY != null && shelf.rotationY !== 0
+        ? shelf.rotationY
+        : shelf.positionX < -5
+          ? Math.PI / 2
+          : shelf.positionX > 5
+            ? -Math.PI / 2
+            : 0
+    root.rotation.y = rotY
 
     const strips: THREE.Mesh[] = []
 
@@ -169,7 +186,7 @@ export class ShelfManager {
 
     // 顶端悬浮看板 Sprite
     const badgeSprite = this.createBadgeSprite(shelf)
-    const badgeHeight = isTable ? 1.6 : 2.7
+    const badgeHeight = isTable ? 2.35 : 2.85
     badgeSprite.position.set(0, badgeHeight, 0)
     root.add(badgeSprite)
 
@@ -191,10 +208,10 @@ export class ShelfManager {
 
     const texture = new THREE.CanvasTexture(canvas)
     texture.colorSpace = THREE.SRGBColorSpace
-    const mat = new THREE.SpriteMaterial({ map: texture, depthTest: false })
+    const mat = new THREE.SpriteMaterial({ map: texture, depthTest: true })
     const sprite = new THREE.Sprite(mat)
-    sprite.scale.set(2.2, 0.68, 1)
-    sprite.renderOrder = 999
+    sprite.scale.set(1.85, 0.58, 1)
+    sprite.renderOrder = 5
     return sprite
   }
 

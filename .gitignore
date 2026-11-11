@@ -35,3 +35,6 @@ build/
 ### Frontend ###
 node_modules/
 frontend-*/dist/
+
+.agents
+.mvn

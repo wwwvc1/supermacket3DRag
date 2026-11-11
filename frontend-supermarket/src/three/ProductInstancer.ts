@@ -57,8 +57,24 @@ export class ProductInstancer {
   private populateShelf(shelf: SceneShelf) {
     if (!shelf.products || shelf.products.length === 0) return
 
-    const isTable = shelf.zone.includes('数码') || shelf.zone.includes('外设') || shelf.zone.includes('穿戴')
+    const isTable =
+      shelf.zone.includes('数码') ||
+      shelf.zone.includes('外设') ||
+      shelf.zone.includes('穿戴') ||
+      shelf.zone.includes('电竞') ||
+      shelf.zone.includes('影音') ||
+      shelf.zone.includes('办公')
     const shelfY = isTable ? 0.95 : 0.4
+
+    // 展台朝向自动对齐门店大门迎客方向
+    const rotY =
+      shelf.rotationY != null && shelf.rotationY !== 0
+        ? shelf.rotationY
+        : shelf.positionX < -5
+          ? Math.PI / 2
+          : shelf.positionX > 5
+            ? -Math.PI / 2
+            : 0
 
     shelf.products.forEach((product, pIdx) => {
       const template = getProductTemplate(product.category, product.name)
@@ -76,7 +92,6 @@ export class ProductInstancer {
 
         // 局部坐标转换到货架世界位姿
         const localPos = new THREE.Vector3(offsetX, offsetY, offsetZ)
-        const rotY = shelf.rotationY || 0
         localPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), rotY)
 
         const worldX = shelf.positionX + localPos.x

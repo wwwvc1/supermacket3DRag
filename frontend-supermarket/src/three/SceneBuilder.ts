@@ -1,9 +1,10 @@
 /**
  * 3D 智慧商业步行街场景生成器 (SceneBuilder.ts)
  * 构建由中央步行大道与两侧 7 座独立商户特色门店组成的电影级商业街区：
- * 1. 中央大道 (石板路面、导向地灯、两侧路灯、景观花坛、街区入口霓虹拱门)
- * 2. 两侧 7 座独立商户店铺 (Apple 旗舰店、Sony 影音店、ROG 电竞馆、生鲜果蔬市集、特仑苏乳品吧、智能穿戴馆、UltraVision 极客超显中心)
- * 3. 彻底移除灰暗起雾滤镜，打造清透写实光影
+ * 1. 阳光明媚的现代商业街氛围（清透天幕、柔和日光、大理石石板路面、迎宾拱门、景观花坛、街灯）
+ * 2. 7 座独立商铺高拟真 3D 建筑外观模型（招牌雨棚、大落地橱窗、特色立面、开放式迎宾门廊）
+ * 3. 店铺交互拾取系统：支持鼠标悬浮高亮与点击开门直飞入店内
+ * 4. 彻底修正 Sprite 文字深度测试 (depthTest: true)，消除黑屏与漂浮重叠遮挡
  */
 import * as THREE from 'three'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
@@ -16,7 +17,8 @@ export interface Bounds {
   height: number
 }
 
-interface ShopConfig {
+export interface ShopConfig {
+  shelfId: number
   code: string
   name: string
   merchantTitle: string
@@ -25,108 +27,149 @@ interface ShopConfig {
   z: number
   width: number
   depth: number
-  themeColor: number
+  height: number
+  wallColor: number
+  accentColor: number
   signColor: number
+  interiorFloorColor: number
   entranceSide: 'right' | 'left' | 'front'
+  description: string
 }
 
 export class SceneBuilder {
   /** 碰撞体列表（用于漫游防穿墙） */
   readonly colliders: THREE.Object3D[] = []
+  /** 可供点击进入店铺的拾取目标集合 */
+  readonly shopPickables: THREE.Mesh[] = []
   sun!: THREE.DirectionalLight
 
-  // 7 座独立商铺规划
-  private shops: ShopConfig[] = [
+  // 7 座独立商铺规划（严格对应 MySQL 数据库中 7 个货架与类目）
+  readonly shops: ShopConfig[] = [
     {
+      shelfId: 6,
       code: 'F01',
       name: 'Apple 旗舰体验店',
       merchantTitle: 'Apple 旗舰店 · 手机数码馆',
       category: '手机数码',
       x: -12.0,
       z: 10.0,
-      width: 7.5,
-      depth: 8.5,
-      themeColor: 0xe2e8f0, // 极简白铝
-      signColor: 0xffffff,
+      width: 8.0,
+      depth: 9.0,
+      height: 4.8,
+      wallColor: 0xf8fafc, // 极简白铝
+      accentColor: 0x94a3b8, // 钛金银
+      signColor: 0x0284c7, // 科技蔚蓝
+      interiorFloorColor: 0xf1f5f9,
       entranceSide: 'right', // 门口朝向中央街道 (向东)
+      description: '极简科技美学，陈列最新款 iPhone 与前沿智能终端',
     },
     {
+      shelfId: 2,
       code: 'B01',
       name: 'Sony 索尼声学馆',
       merchantTitle: 'Sony 索尼声学 · 旗舰影音店',
       category: '数码影音',
       x: -12.0,
       z: -3.0,
-      width: 7.5,
-      depth: 8.5,
-      themeColor: 0x1e293b, // 曜石碳黑
-      signColor: 0xf59e0b, // 琥珀金
+      width: 8.0,
+      depth: 9.0,
+      height: 4.8,
+      wallColor: 0x334155, // 曜石钛灰
+      accentColor: 0xb45309, // 琥珀原木
+      signColor: 0xf59e0b, // 暖金霓虹
+      interiorFloorColor: 0x1e293b,
       entranceSide: 'right',
+      description: '专业声学调音室，陈列旗舰降噪头戴耳机与高保真音响',
     },
     {
+      shelfId: 3,
       code: 'C01',
       name: 'ROG 电竞外设馆',
       merchantTitle: 'ROG 玩家极客 · 电竞外设馆',
       category: '电脑外设',
       x: -12.0,
       z: -16.0,
-      width: 7.5,
-      depth: 8.5,
-      themeColor: 0x0f172a, // 深夜黑钛
-      signColor: 0x06b6d4, // 赛博青
+      width: 8.0,
+      depth: 9.0,
+      height: 4.8,
+      wallColor: 0x1e293b, // 赛博碳黑
+      accentColor: 0x06b6d4, // 荧光赛博青
+      signColor: 0x06b6d4,
+      interiorFloorColor: 0x0f172a,
       entranceSide: 'right',
+      description: '极客电竞竞技场，陈列 RGB 机械键盘与超轻电竞鼠标',
     },
     {
+      shelfId: 1,
       code: 'A01',
       name: '鲜果直采市集',
       merchantTitle: '源头直采 · 鲜果果蔬市集',
       category: '生鲜果蔬',
       x: 12.0,
       z: 10.0,
-      width: 7.5,
-      depth: 8.5,
-      themeColor: 0x78350f, // 原木温润
-      signColor: 0x10b981, // 生机绿
+      width: 8.0,
+      depth: 9.0,
+      height: 4.8,
+      wallColor: 0x78350f, // 暖润雪松木
+      accentColor: 0x10b981, // 生机翠绿
+      signColor: 0x10b981,
+      interiorFloorColor: 0xfef3c7,
       entranceSide: 'left', // 门口朝向中央街道 (向西)
+      description: '生态果园源头直采，陈列新鲜脆甜红富士苹果等时令鲜果',
     },
     {
+      shelfId: 7,
       code: 'G01',
       name: '特仑苏有机乳品吧',
       merchantTitle: '特仑苏 · 有机乳品与冷饮吧',
       category: '乳品冷饮',
       x: 12.0,
       z: -3.0,
-      width: 7.5,
-      depth: 8.5,
-      themeColor: 0x38bdf8, // 冰川天蓝
+      width: 8.0,
+      depth: 9.0,
+      height: 4.8,
+      wallColor: 0x0284c7, // 蔚蓝天际
+      accentColor: 0x38bdf8, // 冰川奶白
       signColor: 0x38bdf8,
+      interiorFloorColor: 0xf0f9ff,
       entranceSide: 'left',
+      description: '高原牧场纯净有机奶源，恒温保鲜冷饮陈列展柜',
     },
     {
+      shelfId: 4,
       code: 'D01',
       name: 'iWatch 智能穿戴馆',
       merchantTitle: 'iWatch · 智能穿戴与健康馆',
       category: '智能穿戴',
       x: 12.0,
       z: -16.0,
-      width: 7.5,
-      depth: 8.5,
-      themeColor: 0x475569, // 钛金流光
-      signColor: 0xa855f7, // 科技紫
+      width: 8.0,
+      depth: 9.0,
+      height: 4.8,
+      wallColor: 0x475569, // 钛金属
+      accentColor: 0xd97706, // 香槟金
+      signColor: 0xc084fc, // 优雅流光紫
+      interiorFloorColor: 0x334155,
       entranceSide: 'left',
+      description: '时尚科技与健康监测中心，陈列精密智能腕表与多功能表带',
     },
     {
+      shelfId: 5,
       code: 'E01',
       name: 'UltraVision 超显中心',
       merchantTitle: 'UltraVision · 高端电竞超显中心',
       category: '电脑办公',
       x: 0.0,
       z: -28.0,
-      width: 13.0,
-      depth: 8.5,
-      themeColor: 0x0284c7, // 深海蓝
-      signColor: 0x38bdf8, // 蔚蓝霓虹
+      width: 14.0,
+      depth: 9.0,
+      height: 5.6,
+      wallColor: 0x0f172a, // 旗舰深曜石
+      accentColor: 0x38bdf8, // 激光霓虹
+      signColor: 0x38bdf8,
+      interiorFloorColor: 0x1e293b,
       entranceSide: 'front', // 门口朝向大道入口 (向南)
+      description: '街区尽头全景超级旗舰店，陈列 4K 144Hz Mini-LED 顶级电竞巨幕',
     },
   ]
 
@@ -144,29 +187,28 @@ export class SceneBuilder {
     this.buildLights()
   }
 
-  /** 清透夜色氛围 (无任何浑浊雾气遮挡) */
+  /** 清爽明亮的现代商业街氛围 (杜绝黑屏死寂) */
   private buildAtmosphere() {
     const pmrem = new THREE.PMREMGenerator(this.renderer)
     const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
     this.scene.environment = envTex
-    this.scene.environmentIntensity = 0.65
-    // 璀璨夜空深蓝底色
-    this.scene.background = new THREE.Color(0x060914)
-    // 彻底清除导致泛白起雾的 Fog
+    this.scene.environmentIntensity = 0.5
+
+    // 清爽通透的蔚蓝天空背景色，彻底杜绝纯黑死寂
+    this.scene.background = new THREE.Color(0x7dd3fc)
+    // 彻底清除导致泛白起雾的无用全局 Fog
     this.scene.fog = null
     pmrem.dispose()
   }
 
   /** 中央步行街大道与两侧人行步道地坪 */
   private buildStreetBoulevard() {
-    // 1. 中央石板沥青主路面 (宽 12m, 长 68m)
-    const roadGeo = new THREE.PlaneGeometry(12, 68)
-    const roadMat = new THREE.MeshPhysicalMaterial({
-      color: 0x181e2b,
-      roughness: 0.35,
-      metalness: 0.1,
-      reflectivity: 0.5,
-      clearcoat: 0.3,
+    // 1. 中央石板主路面 (宽 14m, 长 72m)
+    const roadGeo = new THREE.PlaneGeometry(14, 72)
+    const roadMat = new THREE.MeshStandardMaterial({
+      color: 0x475569, // 质感高级的花岗岩青石板
+      roughness: 0.65,
+      metalness: 0.05,
     })
     const road = new THREE.Mesh(roadGeo, roadMat)
     road.rotation.x = -Math.PI / 2
@@ -174,82 +216,84 @@ export class SceneBuilder {
     road.receiveShadow = true
     this.scene.add(road)
 
-    // 中央导向发光带
+    // 中央导向发光纹理带
     const lineMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
-    const centerLine = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 64), lineMat)
+    const centerLine = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 68), lineMat)
     centerLine.rotation.x = -Math.PI / 2
     centerLine.position.set(0, 0.01, -4)
     this.scene.add(centerLine)
 
-    // 2. 两侧商铺前的人行道广场 (高出路面 0.08m，大理石方砖质感)
-    const sideWalkMat = new THREE.MeshPhysicalMaterial({
-      color: 0x242c3d,
-      roughness: 0.25,
-      metalness: 0.1,
-      reflectivity: 0.6,
-      clearcoat: 0.6,
+    // 2. 两侧商铺前的人行道广场 (高出路面 0.12m，浅灰大理石石砖)
+    const sideWalkMat = new THREE.MeshStandardMaterial({
+      color: 0xcfd8dc, // 浅灰大理石
+      roughness: 0.5,
+      metalness: 0.05,
     })
-    // 左侧人行道
-    const leftWalk = new THREE.Mesh(new THREE.BoxGeometry(14, 0.16, 68), sideWalkMat)
-    leftWalk.position.set(-13, 0.08, -4)
+    // 左侧人行道广场 (x: -7 到 -19)
+    const leftWalk = new THREE.Mesh(new THREE.BoxGeometry(13, 0.24, 72), sideWalkMat)
+    leftWalk.position.set(-13.5, 0.12, -4)
     leftWalk.receiveShadow = true
     this.scene.add(leftWalk)
 
-    // 右侧人行道
-    const rightWalk = new THREE.Mesh(new THREE.BoxGeometry(14, 0.16, 68), sideWalkMat)
-    rightWalk.position.set(13, 0.08, -4)
+    // 右侧人行道广场 (x: 7 到 19)
+    const rightWalk = new THREE.Mesh(new THREE.BoxGeometry(13, 0.24, 72), sideWalkMat)
+    rightWalk.position.set(13.5, 0.12, -4)
     rightWalk.receiveShadow = true
     this.scene.add(rightWalk)
 
-    // 路缘石边缘发光带
-    const curbGlowMat = new THREE.MeshBasicMaterial({ color: 0x0284c7 })
-    const leftCurbGlow = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 68), curbGlowMat)
-    leftCurbGlow.position.set(-6.02, 0.16, -4)
+    // 路缘石与暖金引导光带
+    const curbGlowMat = new THREE.MeshStandardMaterial({
+      color: 0x000000,
+      emissive: 0x0284c7,
+      emissiveIntensity: 1.5,
+    })
+    const leftCurbGlow = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.06, 72), curbGlowMat)
+    leftCurbGlow.position.set(-7.05, 0.24, -4)
     this.scene.add(leftCurbGlow)
 
-    const rightCurbGlow = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 68), curbGlowMat)
-    rightCurbGlow.position.set(6.02, 0.16, -4)
+    const rightCurbGlow = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.06, 72), curbGlowMat)
+    rightCurbGlow.position.set(7.05, 0.24, -4)
     this.scene.add(rightCurbGlow)
   }
 
-  /** 街区设施：路灯、绿化花坛、入口迎宾霓虹拱门 */
+  /** 街区设施：迎宾拱门、路灯、绿化花坛 */
   private buildStreetProps() {
     // 1. 入口迎宾拱门 (Z = 24)
-    const archMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.2 })
+    const archMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.25 })
     const archSignMat = new THREE.MeshStandardMaterial({
-      color: 0x000000,
-      emissive: 0x38bdf8,
-      emissiveIntensity: 2.2,
+      color: 0x0f172a,
+      emissive: 0x0284c7,
+      emissiveIntensity: 1.2,
     })
 
     const archGroup = new THREE.Group()
     archGroup.position.set(0, 0, 24)
 
     // 左右立柱
-    const colLeft = new THREE.Mesh(new THREE.BoxGeometry(0.6, 5.5, 0.6), archMat)
-    colLeft.position.set(-7, 2.75, 0)
+    const colLeft = new THREE.Mesh(new THREE.BoxGeometry(0.8, 5.8, 0.8), archMat)
+    colLeft.position.set(-7.5, 2.9, 0)
     archGroup.add(colLeft)
     this.colliders.push(colLeft)
 
-    const colRight = new THREE.Mesh(new THREE.BoxGeometry(0.6, 5.5, 0.6), archMat)
-    colRight.position.set(7, 2.75, 0)
+    const colRight = new THREE.Mesh(new THREE.BoxGeometry(0.8, 5.8, 0.8), archMat)
+    colRight.position.set(7.5, 2.9, 0)
     archGroup.add(colRight)
     this.colliders.push(colRight)
 
     // 跨街横梁
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(14.8, 0.7, 0.7), archMat)
-    beam.position.set(0, 5.3, 0)
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(15.8, 0.8, 0.8), archMat)
+    beam.position.set(0, 5.8, 0)
     archGroup.add(beam)
 
-    // 拱门发光迎宾标牌
-    const archSign = new THREE.Mesh(new THREE.BoxGeometry(10, 0.45, 0.1), archSignMat)
-    archSign.position.set(0, 5.3, 0.4)
+    // 拱门迎宾标牌
+    const archSign = new THREE.Mesh(new THREE.BoxGeometry(11, 0.6, 0.15), archSignMat)
+    archSign.position.set(0, 5.8, 0.42)
     archGroup.add(archSign)
 
     // 拱门文字 Sprite
-    const archTextSprite = this.createTextSprite('✦ 未来智慧商业街 · FUTURE SHOPPING AVENUE ✦', '#38bdf8', 42)
-    archTextSprite.position.set(0, 5.3, 0.52)
-    archTextSprite.scale.set(7.5, 1.2, 1)
+    const archTextSprite = this.createTextSprite('✦ 智慧未来商业步行街 · SMART SHOPPING BOULEVARD ✦', '#38bdf8', 36)
+    archTextSprite.position.set(0, 5.8, 0.52)
+    archTextSprite.scale.set(8.5, 1.1, 1)
     archGroup.add(archTextSprite)
 
     this.scene.add(archGroup)
@@ -257,45 +301,41 @@ export class SceneBuilder {
     // 2. 街灯与绿化花坛 (沿街两侧成对排布)
     const zPositions = [16, 4, -8, -20]
     zPositions.forEach((z) => {
-      this.createStreetLamp(-5.6, z)
-      this.createStreetLamp(5.6, z)
-      this.createPlanterBox(-6.4, z + 6)
-      this.createPlanterBox(6.4, z + 6)
+      this.createStreetLamp(-6.5, z)
+      this.createStreetLamp(6.5, z)
+      this.createPlanterBox(-7.4, z + 6)
+      this.createPlanterBox(7.4, z + 6)
     })
   }
 
-  /** 创建现代路灯与真实光源 */
+  /** 创建现代路灯与暖色点光源 */
   private createStreetLamp(x: number, z: number) {
     const lampGroup = new THREE.Group()
-    lampGroup.position.set(x, 0.16, z)
+    lampGroup.position.set(x, 0.24, z)
 
-    // 灯杆
-    const poleMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.3 })
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 4.2, 16), poleMat)
-    pole.position.y = 2.1
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.85, roughness: 0.2 })
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 4.4, 16), poleMat)
+    pole.position.y = 2.2
     pole.castShadow = true
     lampGroup.add(pole)
 
-    // 挑臂
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.06, 0.06), poleMat)
-    arm.position.set(x > 0 ? -0.4 : 0.4, 4.15, 0)
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.08, 0.08), poleMat)
+    arm.position.set(x > 0 ? -0.45 : 0.45, 4.35, 0)
     lampGroup.add(arm)
 
     // 发光灯罩
     const headMat = new THREE.MeshStandardMaterial({
-      color: 0x000000,
-      emissive: 0xffedd5,
-      emissiveIntensity: 2.5,
+      color: 0xffffff,
+      emissive: 0xfef3c7,
+      emissiveIntensity: 2.0,
     })
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.08, 0.2), headMat)
-    head.position.set(x > 0 ? -0.7 : 0.7, 4.1, 0)
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16), headMat)
+    head.position.set(x > 0 ? -0.8 : 0.8, 4.25, 0)
     lampGroup.add(head)
 
-    // 暖光点光源 (照亮人行道)
-    const light = new THREE.PointLight(0xffedd5, 12, 10, 1.8)
-    light.position.set(x > 0 ? -0.7 : 0.7, 4.0, 0)
-    light.castShadow = true
-    light.shadow.bias = -0.001
+    // 暖光点光源照亮人行道（无需阴影投射，避免消耗 WebGL 纹理单元）
+    const light = new THREE.PointLight(0xffedd5, 12, 12, 1.6)
+    light.position.set(x > 0 ? -0.8 : 0.8, 4.1, 0)
     lampGroup.add(light)
 
     this.scene.add(lampGroup)
@@ -305,21 +345,20 @@ export class SceneBuilder {
   /** 街头绿植花坛 */
   private createPlanterBox(x: number, z: number) {
     const boxGroup = new THREE.Group()
-    boxGroup.position.set(x, 0.16, z)
+    boxGroup.position.set(x, 0.24, z)
 
-    const boxMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 })
-    const soilMat = new THREE.MeshStandardMaterial({ color: 0x14532d, roughness: 0.9 })
+    const boxMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5 })
+    const plantMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8 })
 
-    const box = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.45, 1.8), boxMat)
-    box.position.y = 0.225
+    const box = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 2.0), boxMat)
+    box.position.y = 0.25
     box.castShadow = true
     box.receiveShadow = true
     boxGroup.add(box)
 
-    // 绿化灌木
-    const bush = new THREE.Mesh(new THREE.DodecahedronGeometry(0.65), soilMat)
-    bush.position.y = 0.7
-    bush.scale.set(1.1, 0.8, 1.3)
+    const bush = new THREE.Mesh(new THREE.DodecahedronGeometry(0.75), plantMat)
+    bush.position.y = 0.85
+    bush.scale.set(1.1, 0.85, 1.3)
     bush.castShadow = true
     boxGroup.add(bush)
 
@@ -327,7 +366,7 @@ export class SceneBuilder {
     this.colliders.push(box)
   }
 
-  /** 构建 7 座具有独立建筑外观与发光门头的商铺 */
+  /** 构建 7 座具有高精独立建筑外观、发光门头与点击进入交互的商铺 */
   private buildShops() {
     this.shops.forEach((cfg) => {
       this.buildSingleShop(cfg)
@@ -337,28 +376,37 @@ export class SceneBuilder {
   /** 单个商铺建筑生成器 */
   private buildSingleShop(cfg: ShopConfig) {
     const shopGroup = new THREE.Group()
-    shopGroup.position.set(cfg.x, 0.16, cfg.z)
+    shopGroup.position.set(cfg.x, 0.24, cfg.z)
 
-    const wallHeight = 4.4
-    const wallThick = 0.25
-    const facadeMat = new THREE.MeshStandardMaterial({
-      color: cfg.themeColor,
-      metalness: 0.35,
-      roughness: 0.45,
+    const wallHeight = cfg.height
+    const wallThick = 0.3
+    const halfW = cfg.width / 2
+    const halfD = cfg.depth / 2
+
+    // 建筑主材质
+    const wallMat = new THREE.MeshStandardMaterial({
+      color: cfg.wallColor,
+      metalness: 0.2,
+      roughness: 0.4,
     })
-    const interiorFloorMat = new THREE.MeshPhysicalMaterial({
-      color: 0x1e293b,
-      roughness: 0.2,
-      reflectivity: 0.7,
-      clearcoat: 0.5,
+    const accentMat = new THREE.MeshStandardMaterial({
+      color: cfg.accentColor,
+      metalness: 0.6,
+      roughness: 0.3,
+    })
+    const interiorFloorMat = new THREE.MeshStandardMaterial({
+      color: cfg.interiorFloorColor,
+      roughness: 0.3,
+      metalness: 0.1,
     })
     const glassMat = new THREE.MeshPhysicalMaterial({
       color: 0xffffff,
-      transmission: 0.92,
-      opacity: 1.0,
+      transmission: 0.9,
+      opacity: 0.85,
       transparent: true,
       roughness: 0.05,
       ior: 1.5,
+      reflectivity: 0.8,
     })
 
     // 1. 室内独立地坪
@@ -368,117 +416,264 @@ export class SceneBuilder {
     floor.receiveShadow = true
     shopGroup.add(floor)
 
-    // 2. 吊顶
-    const ceiling = new THREE.Mesh(new THREE.BoxGeometry(cfg.width, 0.2, cfg.depth), facadeMat)
+    // 2. 吊顶天花板
+    const ceiling = new THREE.Mesh(new THREE.BoxGeometry(cfg.width + 0.2, 0.3, cfg.depth + 0.2), wallMat)
     ceiling.position.y = wallHeight
     shopGroup.add(ceiling)
 
-    // 3. 墙体（带大开门开放式设计）
-    // 后墙 (封闭)
-    const backWall = new THREE.Mesh(new THREE.BoxGeometry(cfg.width, wallHeight, wallThick), facadeMat)
-    backWall.position.set(0, wallHeight / 2, -cfg.depth / 2)
-    backWall.castShadow = true
-    backWall.receiveShadow = true
-    shopGroup.add(backWall)
-    this.colliders.push(backWall)
+    // 3. 实体围墙（三面封闭墙体，仅临街正面开放供出入）
+    if (cfg.entranceSide === 'right') {
+      // 门口朝东：后墙在西侧 (-halfW)，南北两侧为隔断山墙
+      const backWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallHeight, cfg.depth), wallMat)
+      backWall.position.set(-halfW, wallHeight / 2, 0)
+      backWall.castShadow = true
+      backWall.receiveShadow = true
+      shopGroup.add(backWall)
+      this.colliders.push(backWall)
 
-    // 两侧侧墙
-    const sideWallGeo = new THREE.BoxGeometry(wallThick, wallHeight, cfg.depth)
-    const sideWall1 = new THREE.Mesh(sideWallGeo, facadeMat)
-    sideWall1.position.set(-cfg.width / 2, wallHeight / 2, 0)
-    sideWall1.castShadow = true
-    shopGroup.add(sideWall1)
-    this.colliders.push(sideWall1)
+      const northWall = new THREE.Mesh(new THREE.BoxGeometry(cfg.width, wallHeight, wallThick), wallMat)
+      northWall.position.set(0, wallHeight / 2, -halfD)
+      northWall.castShadow = true
+      northWall.receiveShadow = true
+      shopGroup.add(northWall)
+      this.colliders.push(northWall)
 
-    const sideWall2 = new THREE.Mesh(sideWallGeo, facadeMat)
-    sideWall2.position.set(cfg.width / 2, wallHeight / 2, 0)
-    sideWall2.castShadow = true
-    shopGroup.add(sideWall2)
-    this.colliders.push(sideWall2)
+      const southWall = new THREE.Mesh(new THREE.BoxGeometry(cfg.width, wallHeight, wallThick), wallMat)
+      southWall.position.set(0, wallHeight / 2, halfD)
+      southWall.castShadow = true
+      southWall.receiveShadow = true
+      shopGroup.add(southWall)
+      this.colliders.push(southWall)
+    } else if (cfg.entranceSide === 'left') {
+      // 门口朝西：后墙在东侧 (+halfW)，南北两侧为隔断山墙
+      const backWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallHeight, cfg.depth), wallMat)
+      backWall.position.set(halfW, wallHeight / 2, 0)
+      backWall.castShadow = true
+      backWall.receiveShadow = true
+      shopGroup.add(backWall)
+      this.colliders.push(backWall)
 
-    // 4. 临街立面与店铺门头大招牌
+      const northWall = new THREE.Mesh(new THREE.BoxGeometry(cfg.width, wallHeight, wallThick), wallMat)
+      northWall.position.set(0, wallHeight / 2, -halfD)
+      northWall.castShadow = true
+      northWall.receiveShadow = true
+      shopGroup.add(northWall)
+      this.colliders.push(northWall)
+
+      const southWall = new THREE.Mesh(new THREE.BoxGeometry(cfg.width, wallHeight, wallThick), wallMat)
+      southWall.position.set(0, wallHeight / 2, halfD)
+      southWall.castShadow = true
+      southWall.receiveShadow = true
+      shopGroup.add(southWall)
+      this.colliders.push(southWall)
+    } else {
+      // 门口朝南：后墙在北侧 (-halfD)，东西两侧为侧墙
+      const backWall = new THREE.Mesh(new THREE.BoxGeometry(cfg.width, wallHeight, wallThick), wallMat)
+      backWall.position.set(0, wallHeight / 2, -halfD)
+      backWall.castShadow = true
+      backWall.receiveShadow = true
+      shopGroup.add(backWall)
+      this.colliders.push(backWall)
+
+      const westWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallHeight, cfg.depth), wallMat)
+      westWall.position.set(-halfW, wallHeight / 2, 0)
+      westWall.castShadow = true
+      westWall.receiveShadow = true
+      shopGroup.add(westWall)
+      this.colliders.push(westWall)
+
+      const eastWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallHeight, cfg.depth), wallMat)
+      eastWall.position.set(halfW, wallHeight / 2, 0)
+      eastWall.castShadow = true
+      eastWall.receiveShadow = true
+      shopGroup.add(eastWall)
+      this.colliders.push(eastWall)
+    }
+
+    // 4. 临街高拟真门面 (Facade & Entrance)：
+    // 包含开放式双门门廊、两侧通透落地大玻璃橱窗、出挑雨棚与发光大招牌
     const frontGroup = new THREE.Group()
+    const facadeW = cfg.entranceSide === 'front' ? cfg.width : cfg.depth
+    const halfFW = facadeW / 2
 
-    // 发光门头招牌背板
+    // 4.1 门头出挑雨棚 (深 1.4m)
+    const canopyMat = new THREE.MeshStandardMaterial({
+      color: cfg.accentColor,
+      metalness: 0.7,
+      roughness: 0.25,
+    })
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(facadeW * 0.95, 0.3, 1.4), canopyMat)
+    canopy.position.set(0, wallHeight - 0.7, 0.7)
+    canopy.castShadow = true
+    frontGroup.add(canopy)
+
+    // 雨棚下方内嵌筒灯照亮门口地面
+    const downLight = new THREE.PointLight(0xffedd5, 10, 6, 1.8)
+    downLight.position.set(0, wallHeight - 0.9, 0.7)
+    frontGroup.add(downLight)
+
+    // 4.2 3D 立体发光门头大招牌
     const signBoardMat = new THREE.MeshStandardMaterial({
-      color: 0x0a0f1d,
-      roughness: 0.5,
+      color: 0x0f172a,
+      roughness: 0.3,
       metalness: 0.8,
     })
-    const signBoard = new THREE.Mesh(new THREE.BoxGeometry(cfg.width * 0.85, 0.95, 0.18), signBoardMat)
-    signBoard.position.set(0, wallHeight - 0.5, 0)
+    const signBoard = new THREE.Mesh(new THREE.BoxGeometry(facadeW * 0.86, 0.85, 0.16), signBoardMat)
+    signBoard.position.set(0, wallHeight - 0.15, 0.1)
     frontGroup.add(signBoard)
 
-    // 招牌霓虹发光边框
+    // 招牌霓虹发光外框
     const neonBorderMat = new THREE.MeshStandardMaterial({
       color: 0x000000,
       emissive: cfg.signColor,
       emissiveIntensity: 2.2,
     })
-    const neonBorder = new THREE.Mesh(new THREE.BoxGeometry(cfg.width * 0.87, 0.98, 0.14), neonBorderMat)
-    neonBorder.position.set(0, wallHeight - 0.5, -0.02)
+    const neonBorder = new THREE.Mesh(new THREE.BoxGeometry(facadeW * 0.88, 0.88, 0.12), neonBorderMat)
+    neonBorder.position.set(0, wallHeight - 0.15, 0.08)
     frontGroup.add(neonBorder)
 
-    // 店铺专属文字 Sprite 招牌
+    // 店铺专属高清晰度 3D 招牌文字 Sprite (带真实深度测试，杜绝遮挡)
     const signSprite = this.createTextSprite(cfg.merchantTitle, `#${cfg.signColor.toString(16).padStart(6, '0')}`, 34)
-    signSprite.position.set(0, wallHeight - 0.5, 0.18)
-    signSprite.scale.set(cfg.width * 0.78, 0.8, 1)
+    signSprite.position.set(0, wallHeight - 0.15, 0.22)
+    signSprite.scale.set(facadeW * 0.8, 0.78, 1)
     frontGroup.add(signSprite)
 
-    // 透明橱窗玻璃
-    const glassWindow = new THREE.Mesh(new THREE.BoxGeometry(cfg.width * 0.35, 2.8, 0.06), glassMat)
-    glassWindow.position.set(cfg.width * 0.28, 1.4, 0)
-    frontGroup.add(glassWindow)
+    // 4.3 门口两侧建筑立柱 (宽 0.8m)
+    const pillarGeo = new THREE.BoxGeometry(0.8, wallHeight, wallThick)
+    const leftPillar = new THREE.Mesh(pillarGeo, accentMat)
+    leftPillar.position.set(-halfFW + 0.4, wallHeight / 2, 0)
+    leftPillar.castShadow = true
+    frontGroup.add(leftPillar)
+    this.colliders.push(leftPillar)
 
-    // 根据朝向调整立面在店铺中的相对位置
+    const rightPillar = new THREE.Mesh(pillarGeo, accentMat)
+    rightPillar.position.set(halfFW - 0.4, wallHeight / 2, 0)
+    rightPillar.castShadow = true
+    frontGroup.add(rightPillar)
+    this.colliders.push(rightPillar)
+
+    // 4.4 门廊上方封板
+    const topLintel = new THREE.Mesh(new THREE.BoxGeometry(facadeW - 1.6, wallHeight - 3.4, wallThick), wallMat)
+    topLintel.position.set(0, wallHeight - (wallHeight - 3.4) / 2, 0)
+    frontGroup.add(topLintel)
+
+    // 4.5 两侧落地通透大橱窗玻璃与展台基座
+    const windowW = (facadeW - 4.6) / 2
+    if (windowW > 0.8) {
+      // 左橱窗玻璃
+      const glassLeft = new THREE.Mesh(new THREE.BoxGeometry(windowW, 2.8, 0.05), glassMat)
+      glassLeft.position.set(-halfFW + 0.8 + windowW / 2, 1.4, 0)
+      frontGroup.add(glassLeft)
+
+      // 右橱窗玻璃
+      const glassRight = new THREE.Mesh(new THREE.BoxGeometry(windowW, 2.8, 0.05), glassMat)
+      glassRight.position.set(halfFW - 0.8 - windowW / 2, 1.4, 0)
+      frontGroup.add(glassRight)
+
+      // 橱窗底座矮墙
+      const baseGeo = new THREE.BoxGeometry(windowW, 0.25, wallThick)
+      const baseLeft = new THREE.Mesh(baseGeo, accentMat)
+      baseLeft.position.set(-halfFW + 0.8 + windowW / 2, 0.125, 0)
+      frontGroup.add(baseLeft)
+
+      const baseRight = new THREE.Mesh(baseGeo, accentMat)
+      baseRight.position.set(halfFW - 0.8 - windowW / 2, 0.125, 0)
+      frontGroup.add(baseRight)
+    }
+
+    // 4.6 门口迎宾门槛地垫
+    const matGeo = new THREE.PlaneGeometry(3.0, 1.2)
+    const welcomeMat = new THREE.Mesh(
+      matGeo,
+      new THREE.MeshStandardMaterial({
+        color: cfg.accentColor,
+        roughness: 0.9,
+      })
+    )
+    welcomeMat.rotation.x = -Math.PI / 2
+    welcomeMat.position.set(0, 0.015, 0.6)
+    frontGroup.add(welcomeMat)
+
+    // 5. 根据朝向调整立面在店铺中的相对位置
     if (cfg.entranceSide === 'right') {
       // 门口朝东（面朝中央大道）
       frontGroup.rotation.y = Math.PI / 2
-      frontGroup.position.set(cfg.width / 2, 0, 0)
+      frontGroup.position.set(halfW, 0, 0)
     } else if (cfg.entranceSide === 'left') {
       // 门口朝西（面朝中央大道）
       frontGroup.rotation.y = -Math.PI / 2
-      frontGroup.position.set(-cfg.width / 2, 0, 0)
+      frontGroup.position.set(-halfW, 0, 0)
     } else {
-      // 尽头大店朝南
-      frontGroup.position.set(0, 0, cfg.depth / 2)
+      // 尽头大店朝南（面朝大道入口）
+      frontGroup.position.set(0, 0, halfD)
     }
     shopGroup.add(frontGroup)
 
-    // 5. 店内重点照明聚光灯 (打亮展台)
-    const shopLight = new THREE.SpotLight(0xffffff, 18, 12, Math.PI / 3, 0.4)
-    shopLight.position.set(0, wallHeight - 0.3, 0)
+    // 6. 店内重点照明聚光灯 (打亮中央展台，保留真实漫射泛光，关闭 shadow 以节约 WebGL 纹理单元)
+    const shopLight = new THREE.SpotLight(0xffffff, 16, 14, Math.PI / 2.8, 0.35)
+    shopLight.position.set(0, wallHeight - 0.2, 0)
     shopLight.target.position.set(0, 0.9, 0)
-    shopLight.castShadow = true
     shopGroup.add(shopLight)
     shopGroup.add(shopLight.target)
+
+    // 7. 注册店铺点击可拾取热区 (Click to Enter Shop Hitbox)
+    // 覆盖整个门头招牌与大门入口通道，便于用户轻松点中店铺
+    const hitBoxGeo = new THREE.BoxGeometry(facadeW * 0.9, 3.8, 2.2)
+    const hitBoxMat = new THREE.MeshBasicMaterial({ visible: false })
+    const shopHitBox = new THREE.Mesh(hitBoxGeo, hitBoxMat)
+    shopHitBox.position.set(0, 2.0, 0.6)
+
+    // 挂载店铺交互元数据
+    const shopUserData = {
+      isShop: true,
+      shelfId: cfg.shelfId,
+      shelfCode: cfg.code,
+      shopName: cfg.name,
+      merchantTitle: cfg.merchantTitle,
+      category: cfg.category,
+      description: cfg.description,
+      x: cfg.x,
+      z: cfg.z,
+    }
+    shopHitBox.userData = shopUserData
+    frontGroup.add(shopHitBox)
+    this.shopPickables.push(shopHitBox)
+
+    // 招牌本身也作为拾取目标
+    signBoard.userData = shopUserData
+    this.shopPickables.push(signBoard)
 
     this.scene.add(shopGroup)
   }
 
-  /** 主照明系统：清朗月夜主平行光与柔和天光 */
+  /** 主照明系统：清朗日光与柔和半球环境光 (平衡光比，杜绝过曝泛白) */
   private buildLights() {
-    // 漫射环境天光
-    const ambient = new THREE.AmbientLight(0x384b70, 1.2)
+    // 1. 半球天光（天空明亮蓝白，地面轻微暖灰反射，立体通透）
+    const hemiLight = new THREE.HemisphereLight(0xdbeafe, 0x64748b, 0.7)
+    hemiLight.position.set(0, 40, 0)
+    this.scene.add(hemiLight)
+
+    // 2. 纯白温和环境光，适度柔光
+    const ambient = new THREE.AmbientLight(0xffffff, 0.9)
     this.scene.add(ambient)
 
-    // 主平行光（承担柔和阴影投射）
-    this.sun = new THREE.DirectionalLight(0xdbeafe, 1.8)
-    this.sun.position.set(15, 25, 18)
+    // 3. 温暖主太阳平行光（承担逼真柔和阴影投射）
+    this.sun = new THREE.DirectionalLight(0xfffbeb, 1.8)
+    this.sun.position.set(20, 36, 18)
     this.sun.castShadow = true
     this.sun.shadow.mapSize.width = 2048
     this.sun.shadow.mapSize.height = 2048
     this.sun.shadow.camera.near = 0.5
-    this.sun.shadow.camera.far = 80
-    this.sun.shadow.camera.left = -30
-    this.sun.shadow.camera.right = 30
-    this.sun.shadow.camera.top = 40
-    this.sun.shadow.camera.bottom = -40
+    this.sun.shadow.camera.far = 100
+    this.sun.shadow.camera.left = -35
+    this.sun.shadow.camera.right = 35
+    this.sun.shadow.camera.top = 45
+    this.sun.shadow.camera.bottom = -45
     this.sun.shadow.bias = -0.0008
     this.scene.add(this.sun)
   }
 
-  /** Canvas 绘制高清晰度 3D 文字 Sprite */
+  /** Canvas 绘制高清晰度 3D 文字 Sprite（必须保留 depthTest: true 杜绝遮挡乱飞） */
   private createTextSprite(text: string, colorHex: string, fontSize = 32): THREE.Sprite {
     const canvas = document.createElement('canvas')
     canvas.width = 1024
@@ -492,11 +687,11 @@ export class SceneBuilder {
 
       // 发光外阴影
       ctx.shadowColor = colorHex
-      ctx.shadowBlur = 18
+      ctx.shadowBlur = 16
       ctx.fillStyle = '#ffffff'
       ctx.fillText(text, canvas.width / 2, canvas.height / 2)
 
-      // 再次叠加纯色以保证字迹清晰
+      // 叠加纯色以保证字迹清晰
       ctx.shadowBlur = 0
       ctx.fillStyle = colorHex
       ctx.fillText(text, canvas.width / 2, canvas.height / 2)
@@ -504,9 +699,10 @@ export class SceneBuilder {
 
     const tex = new THREE.CanvasTexture(canvas)
     tex.colorSpace = THREE.SRGBColorSpace
-    const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false })
+    // 关键修正：开启 depthTest，尊重 3D 深度遮挡关系
+    const mat = new THREE.SpriteMaterial({ map: tex, depthTest: true })
     const sprite = new THREE.Sprite(mat)
-    sprite.renderOrder = 900
+    sprite.renderOrder = 10
     return sprite
   }
 }

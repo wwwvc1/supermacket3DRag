@@ -31,12 +31,12 @@ export class PostProcessing {
     this.composer.addPass(this.renderPass)
 
     // 2. 选择性柔和辉光通道 (Bloom)
-    // 关键参数调整：threshold 设为 1.05，仅发光材质生效，防止地面和墙壁起雾！
+    // 关键参数调整：threshold 设为 1.6，仅真正的高亮自发光/霓虹材质生效，杜绝地面与墙壁泛白起雾！
     this.bloomPass = new UnrealBloomPass(
       new THREE.Vector2(size.x, size.y),
-      0.45, // strength
-      0.35, // radius
-      1.05  // threshold
+      0.28, // strength：自然清透，不泛白
+      0.25, // radius
+      1.6   // threshold：仅发光材质生效
     )
     this.composer.addPass(this.bloomPass)
 

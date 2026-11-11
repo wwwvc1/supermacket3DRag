@@ -41,6 +41,9 @@ onMounted(async () => {
   // 1. 初始化 3D 核心世界
   world = new SupermarketWorld({
     onProductSelected: (id) => sceneStore.selectProduct(id),
+    onShopSelected: (shelfId) => {
+      sceneStore.currentShopShelfId = shelfId
+    },
     onModeChanged: (m) => (cameraMode.value = m),
     onFpsUpdated: (f) => (fps.value = f),
   })
@@ -104,6 +107,46 @@ function handleCloseRoute() {
       @open-merchant="merchantDrawerVisible = true"
       @toggle-mode="handleToggleMode"
     />
+
+    <!-- 正在店内深度浏览 HUD 指示条 -->
+    <transition
+      enter-active-class="transition duration-300 ease-out"
+      enter-from-class="opacity-0 -translate-y-4"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition duration-200 ease-in"
+      leave-from-class="opacity-100 translate-y-0"
+      leave-to-class="opacity-0 -translate-y-4"
+    >
+      <div
+        v-if="sceneStore.currentShop"
+        class="fixed top-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-4 px-6 py-2.5 rounded-2xl bg-slate-900/90 backdrop-blur-xl border border-cyan-500/40 shadow-2xl shadow-cyan-500/15 text-white"
+      >
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow text-white font-bold text-sm">
+            🏬
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-xs tracking-wide text-white">正在店内浏览：{{ sceneStore.currentShop.name }}</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                {{ sceneStore.currentShop.zone }}
+              </span>
+            </div>
+            <div class="text-[11px] text-slate-300 mt-0.5">
+              点击展台商品可悬浮 360° 自转展示并加入购物车
+            </div>
+          </div>
+        </div>
+
+        <button
+          @click="sceneStore.exitShop()"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-xs font-semibold text-white shadow-md shadow-sky-500/25 active:scale-95 transition"
+        >
+          <span>🚶</span>
+          <span>走出店铺回到街区</span>
+        </button>
+      </div>
+    </transition>
 
     <!-- 第一人称漫游提示 -->
     <RoamingControlHelp
