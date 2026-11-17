@@ -6,6 +6,7 @@ import com.example.demo.model.dto.GuideRouteRequestDTO;
 import com.example.demo.model.vo.GuideRouteResponseVO;
 import com.example.demo.model.vo.WaypointVO;
 import com.example.demo.service.rag.AiGuideAgentService;
+import com.example.demo.service.rag.tool.EcommerceTools;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,9 @@ class AiGuideAgentTest {
 
     @Autowired
     private AiGuideController aiGuideController;
+
+    @Autowired
+    private EcommerceTools ecommerceTools;
 
     @Test
     @DisplayName("测试自然语言清单意图解析与最近邻 3D 导购动线规划")
@@ -77,5 +81,33 @@ class AiGuideAgentTest {
         assertNotNull(response);
         assertEquals(0, response.getTotalStops());
         assertTrue(response.getWaypoints().isEmpty());
+    }
+
+    @Test
+    @DisplayName("测试中英文品牌别名字典及量词切分边界（三星手机 + 茅台）")
+    void testBilingualQuantifierAndBrandLookup() {
+        GuideRouteRequestDTO request = new GuideRouteRequestDTO("我想买一部三星手机和茅台");
+        Result<GuideRouteResponseVO> result = aiGuideController.planRoute(request);
+
+        assertNotNull(result);
+        assertEquals(200, result.getCode());
+        GuideRouteResponseVO response = result.getData();
+        assertNotNull(response);
+        assertTrue(response.getTotalStops() >= 2, "应当同时命中三星手机与贵州茅台酒");
+
+        List<WaypointVO> waypoints = response.getWaypoints();
+        assertTrue(
+                waypoints.stream().anyMatch(wp -> wp.getProductName() != null && wp.getProductName().contains("Samsung")),
+                "导购路径应命中 Samsung Galaxy S22 Ultra"
+        );
+        assertTrue(
+                waypoints.stream().anyMatch(wp -> wp.getProductName() != null && wp.getProductName().contains("茅台")),
+                "导购路径应命中贵州茅台酒"
+        );
+
+        String toolSummary = ecommerceTools.queryProductByName("你好，请问店里现在有什么三星手机？");
+        assertNotNull(toolSummary);
+        assertTrue(toolSummary.contains("Samsung Galaxy S22 Ultra"),
+                "EcommerceTools 应展开寒暄词与三星英文别名并命中 Samsung Galaxy S22 Ultra");
     }
 }

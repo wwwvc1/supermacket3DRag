@@ -73,6 +73,11 @@ public class MerchantServiceImpl implements MerchantService {
         product.setStock(dto.getStock() != null ? dto.getStock() : 0);
         product.setStatus(dto.getStatus() != null ? dto.getStatus() : "ON_SHELF");
         product.setDescription(dto.getDescription());
+        product.setImageUrl(dto.getImageUrl());
+        product.setBackImageUrl(dto.getBackImageUrl());
+        product.setSideImageUrl(dto.getSideImageUrl());
+        product.setShowroomStage(dto.getShowroomStage());
+        product.setColorHex(dto.getColorHex());
         product.setCreatedAt(LocalDateTime.now());
         product.setUpdatedAt(LocalDateTime.now());
 
@@ -114,6 +119,21 @@ public class MerchantServiceImpl implements MerchantService {
         }
         if (dto.getDescription() != null) {
             product.setDescription(dto.getDescription());
+        }
+        if (dto.getImageUrl() != null) {
+            product.setImageUrl(dto.getImageUrl());
+        }
+        if (dto.getBackImageUrl() != null) {
+            product.setBackImageUrl(dto.getBackImageUrl());
+        }
+        if (dto.getSideImageUrl() != null) {
+            product.setSideImageUrl(dto.getSideImageUrl());
+        }
+        if (dto.getShowroomStage() != null) {
+            product.setShowroomStage(dto.getShowroomStage());
+        }
+        if (dto.getColorHex() != null) {
+            product.setColorHex(dto.getColorHex());
         }
         product.setUpdatedAt(LocalDateTime.now());
 

@@ -39,6 +39,26 @@ public class Orders implements Serializable {
      */
     private String status;
 
+    /**
+     * 支付方式: UNPAID (未支付), ALIPAY_SANDBOX (支付宝沙箱), ALIPAY_SANDBOX_SIM (沙箱预演支付)
+     */
+    private String paymentMethod;
+
+    /**
+     * 第三方支付流水号 (支付宝 trade_no，用于沙箱对账与退款扩展)
+     */
+    private String tradeNo;
+
+    /**
+     * 支付完成时间
+     */
+    private LocalDateTime paidAt;
+
+    /**
+     * 订单支付标题 (支付宝沙箱收银台展示名称)
+     */
+    private String paySubject;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
@@ -51,6 +71,7 @@ public class Orders implements Serializable {
         this.userId = userId;
         this.totalAmount = totalAmount;
         this.status = status;
+        this.paymentMethod = "UNPAID";
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
@@ -93,6 +114,38 @@ public class Orders implements Serializable {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(String paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }
+
+    public String getTradeNo() {
+        return tradeNo;
+    }
+
+    public void setTradeNo(String tradeNo) {
+        this.tradeNo = tradeNo;
+    }
+
+    public LocalDateTime getPaidAt() {
+        return paidAt;
+    }
+
+    public void setPaidAt(LocalDateTime paidAt) {
+        this.paidAt = paidAt;
+    }
+
+    public String getPaySubject() {
+        return paySubject;
+    }
+
+    public void setPaySubject(String paySubject) {
+        this.paySubject = paySubject;
     }
 
     public LocalDateTime getCreatedAt() {

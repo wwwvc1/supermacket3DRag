@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS `shelf` (
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. 商品表 (扩展关联 shelf_id 与 status 上下架状态)
+-- 3. 商品表 (扩展关联 shelf_id、上下架状态、展厅分类与真实多视角图路径)
 CREATE TABLE IF NOT EXISTS `product` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
   `shelf_id` BIGINT DEFAULT NULL,
@@ -38,6 +38,11 @@ CREATE TABLE IF NOT EXISTS `product` (
   `stock` INT NOT NULL DEFAULT 0,
   `status` VARCHAR(32) NOT NULL DEFAULT 'ON_SHELF',
   `description` VARCHAR(1000) DEFAULT NULL,
+  `image_url` VARCHAR(512) DEFAULT NULL,
+  `back_image_url` VARCHAR(512) DEFAULT NULL,
+  `side_image_url` VARCHAR(512) DEFAULT NULL,
+  `showroom_stage` VARCHAR(32) DEFAULT NULL,
+  `color_hex` VARCHAR(32) DEFAULT NULL,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -52,13 +57,17 @@ CREATE TABLE IF NOT EXISTS `cart_item` (
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 5. 订单主表
+-- 5. 订单主表 (预留支付宝沙箱支付渠道、交易流水号、支付时间与标题)
 CREATE TABLE IF NOT EXISTS `orders` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
   `order_no` VARCHAR(64) NOT NULL UNIQUE,
   `user_id` BIGINT NOT NULL,
   `total_amount` DECIMAL(10,2) NOT NULL,
   `status` VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+  `payment_method` VARCHAR(32) NOT NULL DEFAULT 'UNPAID',
+  `trade_no` VARCHAR(64) DEFAULT NULL,
+  `paid_at` DATETIME DEFAULT NULL,
+  `pay_subject` VARCHAR(255) DEFAULT NULL,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 );

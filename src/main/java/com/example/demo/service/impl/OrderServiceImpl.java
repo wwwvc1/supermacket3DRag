@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.demo.common.constant.RedisConstants;
 import com.example.demo.common.exception.BusinessException;
+import com.example.demo.entity.CartItem;
 import com.example.demo.entity.OrderItem;
 import com.example.demo.entity.Orders;
 import com.example.demo.entity.Product;
+import com.example.demo.mapper.CartItemMapper;
 import com.example.demo.mapper.OrderItemMapper;
 import com.example.demo.mapper.OrderMapper;
 import com.example.demo.mapper.ProductMapper;
@@ -43,6 +45,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper;
     private final OrderItemMapper orderItemMapper;
     private final ProductMapper productMapper;
+    private final CartItemMapper cartItemMapper;
     private final RedissonClient redissonClient;
     private final StringRedisTemplate redisTemplate;
     private final SupermarketEventPublisher eventPublisher;
@@ -50,12 +53,14 @@ public class OrderServiceImpl implements OrderService {
     public OrderServiceImpl(OrderMapper orderMapper,
                             OrderItemMapper orderItemMapper,
                             ProductMapper productMapper,
+                            CartItemMapper cartItemMapper,
                             RedissonClient redissonClient,
                             StringRedisTemplate redisTemplate,
                             SupermarketEventPublisher eventPublisher) {
         this.orderMapper = orderMapper;
         this.orderItemMapper = orderItemMapper;
         this.productMapper = productMapper;
+        this.cartItemMapper = cartItemMapper;
         this.redissonClient = redissonClient;
         this.redisTemplate = redisTemplate;
         this.eventPublisher = eventPublisher;
@@ -138,16 +143,21 @@ public class OrderServiceImpl implements OrderService {
                 orderItemsToSave.add(orderItem);
             }
 
-            // 生成唯一订单号并保存订单
+            // 生成唯一订单号并保存订单 (预设支付宝沙箱待支付标题与状态)
             String orderNo = "ORD" + System.currentTimeMillis() + ThreadLocalRandom.current().nextInt(1000, 9999);
+            String subject = buildPaySubject(orderItemsToSave);
             Orders order = new Orders(orderNo, userId, totalAmount, "PENDING");
+            order.setPaymentMethod("UNPAID");
+            order.setPaySubject(subject);
             orderMapper.insert(order);
 
-            // 保存订单明细项
+            // 保存订单明细项并汇总本次已购买的商品 ID
             List<OrderItemVO> itemVOList = new ArrayList<>();
+            List<Long> purchasedProductIds = new ArrayList<>();
             for (OrderItem orderItem : orderItemsToSave) {
                 orderItem.setOrderId(order.getId());
                 orderItemMapper.insert(orderItem);
+                purchasedProductIds.add(orderItem.getProductId());
 
                 itemVOList.add(new OrderItemVO(
                         orderItem.getId(),
@@ -156,6 +166,13 @@ public class OrderServiceImpl implements OrderService {
                         orderItem.getPrice(),
                         orderItem.getQuantity()
                 ));
+            }
+
+            // 下单成功后自动清理用户购物车中对应已购买商品
+            if (!purchasedProductIds.isEmpty() && userId != null) {
+                cartItemMapper.delete(new LambdaQueryWrapper<CartItem>()
+                        .eq(CartItem::getUserId, userId)
+                        .in(CartItem::getProductId, purchasedProductIds));
             }
 
             // 3D 数字孪生超市库存实时变动广播与货架状态联动
@@ -168,15 +185,7 @@ public class OrderServiceImpl implements OrderService {
             }
 
             log.info("用户 [{}] 成功下单，订单编号: [{}], 总金额: [{}]", userId, orderNo, totalAmount);
-            return new OrderVO(
-                    order.getId(),
-                    order.getOrderNo(),
-                    order.getUserId(),
-                    order.getTotalAmount(),
-                    order.getStatus(),
-                    order.getCreatedAt(),
-                    itemVOList
-            );
+            return toOrderVO(order, itemVOList);
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -201,33 +210,148 @@ public class OrderServiceImpl implements OrderService {
 
         List<OrderVO> voList = new ArrayList<>();
         for (Orders order : ordersPage.getRecords()) {
-            List<OrderItem> items = orderItemMapper.selectList(new LambdaQueryWrapper<OrderItem>()
-                    .eq(OrderItem::getOrderId, order.getId()));
-
-            List<OrderItemVO> itemVOList = new ArrayList<>();
-            for (OrderItem item : items) {
-                itemVOList.add(new OrderItemVO(
-                        item.getId(),
-                        item.getProductId(),
-                        item.getProductName(),
-                        item.getPrice(),
-                        item.getQuantity()
-                ));
-            }
-
-            voList.add(new OrderVO(
-                    order.getId(),
-                    order.getOrderNo(),
-                    order.getUserId(),
-                    order.getTotalAmount(),
-                    order.getStatus(),
-                    order.getCreatedAt(),
-                    itemVOList
-            ));
+            List<OrderItemVO> itemVOList = loadOrderItemVOs(order.getId());
+            voList.add(toOrderVO(order, itemVOList));
         }
 
         Page<OrderVO> resultPage = new Page<>(ordersPage.getCurrent(), ordersPage.getSize(), ordersPage.getTotal());
         resultPage.setRecords(voList);
         return resultPage;
+    }
+
+    @Override
+    public OrderVO getOrderByNo(Long userId, String orderNo) {
+        if (orderNo == null || orderNo.isBlank()) {
+            throw new BusinessException(400, "订单编号不能为空");
+        }
+        Orders order = orderMapper.selectOne(new LambdaQueryWrapper<Orders>()
+                .eq(Orders::getOrderNo, orderNo.trim()));
+        if (order == null || !order.getUserId().equals(userId)) {
+            throw new BusinessException(404, "订单不存在或无权查看: " + orderNo);
+        }
+        return toOrderVO(order, loadOrderItemVOs(order.getId()));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public OrderVO cancelOrder(Long userId, String orderNo) {
+        if (orderNo == null || orderNo.isBlank()) {
+            throw new BusinessException(400, "订单编号不能为空");
+        }
+        Orders order = orderMapper.selectOne(new LambdaQueryWrapper<Orders>()
+                .eq(Orders::getOrderNo, orderNo.trim()));
+        if (order == null || !order.getUserId().equals(userId)) {
+            throw new BusinessException(404, "订单不存在或无权操作: " + orderNo);
+        }
+        if ("PAID".equalsIgnoreCase(order.getStatus())) {
+            throw new BusinessException(400, "已支付订单暂不支持直接取消，后续可通过支付宝退款接口原路退回");
+        }
+        if ("CANCELLED".equalsIgnoreCase(order.getStatus())) {
+            return toOrderVO(order, loadOrderItemVOs(order.getId()));
+        }
+
+        List<OrderItem> items = orderItemMapper.selectList(new LambdaQueryWrapper<OrderItem>()
+                .eq(OrderItem::getOrderId, order.getId())
+                .orderByAsc(OrderItem::getProductId));
+
+        List<RLock> acquiredLocks = new ArrayList<>();
+        List<long[]> restoredProducts = new ArrayList<>();
+        try {
+            for (OrderItem item : items) {
+                String lockKey = RedisConstants.ORDER_LOCK_PREFIX + item.getProductId();
+                RLock lock = redissonClient.getLock(lockKey);
+                boolean locked = lock.tryLock(
+                        RedisConstants.LOCK_WAIT_TIME_SECONDS,
+                        RedisConstants.LOCK_LEASE_TIME_SECONDS,
+                        TimeUnit.SECONDS
+                );
+                if (!locked) {
+                    throw new BusinessException(429, "库存锁定繁忙，请稍后重试取消订单");
+                }
+                acquiredLocks.add(lock);
+
+                productMapper.restoreStock(item.getProductId(), item.getQuantity());
+                redisTemplate.delete(RedisConstants.PRODUCT_CACHE_PREFIX + item.getProductId());
+
+                Product latest = productMapper.selectById(item.getProductId());
+                if (latest != null) {
+                    restoredProducts.add(new long[]{latest.getId(), latest.getStock()});
+                }
+            }
+
+            order.setStatus("CANCELLED");
+            order.setUpdatedAt(LocalDateTime.now());
+            orderMapper.updateById(order);
+
+            for (long[] entry : restoredProducts) {
+                try {
+                    eventPublisher.publishInventoryChanged(entry[0], (int) entry[1]);
+                } catch (Exception e) {
+                    log.warn("取消订单 [{}] 触发 WebSocket 库存回滚广播失败: {}", orderNo, e.getMessage());
+                }
+            }
+
+            log.info("用户 [{}] 已取消待支付订单 [{}]，已安全释放 {} 项商品库存", userId, orderNo, restoredProducts.size());
+            return toOrderVO(order, toItemVOs(items));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException(500, "取消订单操作被意外中断");
+        } finally {
+            for (RLock lock : acquiredLocks) {
+                if (lock.isHeldByCurrentThread()) {
+                    lock.unlock();
+                }
+            }
+        }
+    }
+
+    /**
+     * 组装支付收银台订单标题
+     */
+    private String buildPaySubject(List<OrderItem> items) {
+        if (items == null || items.isEmpty()) {
+            return "KORA Tactile Archive 精选订单";
+        }
+        String first = items.get(0).getProductName();
+        return items.size() > 1
+                ? "KORA · " + first + " 等 " + items.size() + " 件藏品"
+                : "KORA · " + first;
+    }
+
+    private List<OrderItemVO> loadOrderItemVOs(Long orderId) {
+        List<OrderItem> items = orderItemMapper.selectList(new LambdaQueryWrapper<OrderItem>()
+                .eq(OrderItem::getOrderId, orderId));
+        return toItemVOs(items);
+    }
+
+    private List<OrderItemVO> toItemVOs(List<OrderItem> items) {
+        List<OrderItemVO> itemVOList = new ArrayList<>();
+        for (OrderItem item : items) {
+            itemVOList.add(new OrderItemVO(
+                    item.getId(),
+                    item.getProductId(),
+                    item.getProductName(),
+                    item.getPrice(),
+                    item.getQuantity()
+            ));
+        }
+        return itemVOList;
+    }
+
+    private OrderVO toOrderVO(Orders order, List<OrderItemVO> itemVOList) {
+        OrderVO vo = new OrderVO(
+                order.getId(),
+                order.getOrderNo(),
+                order.getUserId(),
+                order.getTotalAmount(),
+                order.getStatus(),
+                order.getCreatedAt(),
+                itemVOList
+        );
+        vo.setPaymentMethod(order.getPaymentMethod());
+        vo.setTradeNo(order.getTradeNo());
+        vo.setPaidAt(order.getPaidAt());
+        vo.setPaySubject(order.getPaySubject());
+        return vo;
     }
 }

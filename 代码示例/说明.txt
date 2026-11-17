@@ -1,0 +1,13 @@
+本目录是独立学习示例，不会被当前 Maven 工程编译，也不会被 Spring 扫描。
+
+fastapi/     Python FastAPI：JWT 签发校验 + SQLAlchemy 连接 MySQL
+springboot/  Java Spring Boot：JJWT + Spring Security + HikariCP + MyBatis-Plus
+
+两边都演示同一条链路：
+1. 用连接池连 MySQL
+2. 按用户名查出用户并校验密码
+3. 签发 JWT，请求头使用 Authorization: Bearer <token>
+4. 后续接口解析令牌，取出 userId / username
+
+密钥、账号、密码一律用占位符。复制到真实环境前请改掉，并从环境变量读取，不要写进仓库。
+FastAPI 示例只供对照阅读。本仓库运行时仍是纯 Java，不要把 Python 依赖加进 Maven 工程。

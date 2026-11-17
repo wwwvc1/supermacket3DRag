@@ -27,4 +27,22 @@ public interface OrderService {
      * @return 订单分页
      */
     Page<OrderVO> listUserOrders(Long userId, int page, int size);
+
+    /**
+     * 根据订单流水号查询当前用户的订单详情
+     *
+     * @param userId  用户 ID
+     * @param orderNo 唯一订单号
+     * @return 订单详情 VO
+     */
+    OrderVO getOrderByNo(Long userId, String orderNo);
+
+    /**
+     * 取消待支付订单 (在 Redisson 分布式锁保护下安全回滚商品库存并广播实时库存恢复)
+     *
+     * @param userId  当前用户 ID
+     * @param orderNo 待取消的订单号
+     * @return 更新后的订单详情 VO
+     */
+    OrderVO cancelOrder(Long userId, String orderNo);
 }

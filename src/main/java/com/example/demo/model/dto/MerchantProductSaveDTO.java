@@ -17,6 +17,11 @@ public class MerchantProductSaveDTO implements Serializable {
     private Integer stock;
     private String status;
     private String description;
+    private String imageUrl;
+    private String backImageUrl;
+    private String sideImageUrl;
+    private String showroomStage;
+    private String colorHex;
 
     public MerchantProductSaveDTO() {
     }
@@ -85,5 +90,45 @@ public class MerchantProductSaveDTO implements Serializable {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
+    }
+
+    public String getBackImageUrl() {
+        return backImageUrl;
+    }
+
+    public void setBackImageUrl(String backImageUrl) {
+        this.backImageUrl = backImageUrl;
+    }
+
+    public String getSideImageUrl() {
+        return sideImageUrl;
+    }
+
+    public void setSideImageUrl(String sideImageUrl) {
+        this.sideImageUrl = sideImageUrl;
+    }
+
+    public String getShowroomStage() {
+        return showroomStage;
+    }
+
+    public void setShowroomStage(String showroomStage) {
+        this.showroomStage = showroomStage;
+    }
+
+    public String getColorHex() {
+        return colorHex;
+    }
+
+    public void setColorHex(String colorHex) {
+        this.colorHex = colorHex;
     }
 }

@@ -37,4 +37,5 @@ node_modules/
 frontend-*/dist/
 
 .agents
+.superpowers
 .mvn

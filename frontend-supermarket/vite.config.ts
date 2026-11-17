@@ -1,23 +1,31 @@
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
+import path from "node:path";
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 /**
- * 3D 购物体验端 Vite 配置
- * 后端 Spring Security 关闭了 CORS，因此开发期通过代理转发 /api 与 /ws，前端一律使用相对路径。
+ * KORA × TACTILE ARCHIVE 3D 触感物理陈列旗舰店 Vite 配置
+ * 开发期通过代理转发 /api 与 /ws 至后端 Spring Boot (localhost:8080)
  */
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
   server: {
     port: 5173,
     proxy: {
-      '/api': { target: 'http://localhost:8080', changeOrigin: true },
-      '/ws': { target: 'ws://localhost:8080', ws: true, changeOrigin: true },
+      "/api": { target: "http://localhost:8080", changeOrigin: true },
+      "/ws": { target: "ws://localhost:8080", ws: true, changeOrigin: true },
     },
   },
   build: {
     chunkSizeWarningLimit: 1500,
   },
   test: {
-    environment: 'node',
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./src/test-setup.ts"],
   },
-} as any)
+} as any);

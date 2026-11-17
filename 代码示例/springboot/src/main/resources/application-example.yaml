@@ -1,0 +1,45 @@
+# Spring Boot 数据源与 JWT 示例配置。
+# 这是一份对照文件，没有被主工程加载。
+# 正式项目把同名字段写进 src/main/resources/application.yaml，或用环境变量覆盖。
+#
+# 未自定义 DataSource Bean 时，spring-boot-starter-jdbc 会按这里的配置
+# 自动创建 HikariCP 连接池。下面的代码示例又手写了一个 DataSource Bean，
+# 二者不要同时放进同一个运行中的应用，否则会得到两个数据源。
+
+server:
+  port: 8080
+
+spring:
+  datasource:
+    # createDatabaseIfNotExist 只对本地演示方便。生产库应由 DBA 预先建好。
+    url: jdbc:mysql://127.0.0.1:3306/demo_auth?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
+    username: root
+    password: 请改成你的密码
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: ExampleHikariPool
+      # 池中最大连接数。不是越大越好，要小于 MySQL max_connections，并给其他服务留余量。
+      maximum-pool-size: 20
+      # 空闲时保留的最少连接，避免流量突然上来时全部重新建连。
+      minimum-idle: 5
+      # 从池里拿连接的最长等待时间，毫秒。超时抛 SQLTransientConnectionException。
+      connection-timeout: 30000
+      # 空闲连接超过该时间可以被回收，毫秒。
+      idle-timeout: 600000
+      # 连接最长寿命，毫秒。应小于 MySQL wait_timeout，让客户端先于服务端关闭连接。
+      max-lifetime: 1800000
+
+mybatis-plus:
+  configuration:
+    # 数据库列 user_name 映射到 Java 属性 userName。
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      # 主键由数据库自增，插入后回填到实体 id。
+      id-type: auto
+
+jwt:
+  # HS256 密钥。长度建议不少于 32 字节。生产环境用环境变量 JWT_SECRET 注入。
+  secret: 请换成至少32字节的随机密钥-demo-only-change-me-32bytes
+  # 有效期，毫秒。86400000 = 24 小时。
+  expiration: 86400000

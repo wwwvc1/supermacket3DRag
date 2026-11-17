@@ -56,3 +56,17 @@ rag:
     collection-name: "ecommerce_knowledge"
     # 当 Chroma 未启动时自动降级为 InMemory 模式，确保无外部容器也能秒跑
     fallback-to-in-memory: true
+
+# 支付宝沙箱支付配置 (后续接入支付宝沙箱只需填入 APPID 与 RSA2 密钥并将 enabled 设为 true)
+alipay:
+  enabled: false
+  sandbox-simulation-enabled: true
+  app-id: ""
+  private-key: ""
+  alipay-public-key: ""
+  gateway-url: "https://openapi-sandbox.dl.gateway.alipaydev.com/gateway.do"
+  notify-url: "http://localhost:8080/api/payment/alipay/notify"
+  return-url: "http://localhost:5173/?pay_status=success"
+  sign-type: "RSA2"
+  charset: "UTF-8"
+  format: "json"

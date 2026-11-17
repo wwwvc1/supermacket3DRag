@@ -158,8 +158,10 @@ public class RagAgentService {
         // 3. 检查是否涉及电商商品实时查询工具
         String toolInfo = "";
         if (question.contains("商品") || question.contains("库存") || question.contains("价格")
-                || question.contains("多少钱") || question.contains("手机") || question.contains("耳机")) {
-            toolInfo = ecommerceTools.queryProductByName(question.replaceAll("[?？什么有吗价格库存]", ""));
+                || question.contains("多少钱") || question.contains("手机") || question.contains("耳机")
+                || question.contains("推荐") || question.contains("在售") || question.contains("有什么")
+                || question.contains("三星") || question.contains("华为") || question.contains("茅台")) {
+            toolInfo = ecommerceTools.queryProductByName(question);
         }
 
         // 4. 构建结构化提示词

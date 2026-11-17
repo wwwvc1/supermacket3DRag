@@ -17,6 +17,10 @@ public class OrderVO implements Serializable {
     private Long userId;
     private BigDecimal totalAmount;
     private String status;
+    private String paymentMethod;
+    private String tradeNo;
+    private LocalDateTime paidAt;
+    private String paySubject;
     private LocalDateTime createdAt;
     private List<OrderItemVO> items;
 
@@ -71,6 +75,38 @@ public class OrderVO implements Serializable {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(String paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }
+
+    public String getTradeNo() {
+        return tradeNo;
+    }
+
+    public void setTradeNo(String tradeNo) {
+        this.tradeNo = tradeNo;
+    }
+
+    public LocalDateTime getPaidAt() {
+        return paidAt;
+    }
+
+    public void setPaidAt(LocalDateTime paidAt) {
+        this.paidAt = paidAt;
+    }
+
+    public String getPaySubject() {
+        return paySubject;
+    }
+
+    public void setPaySubject(String paySubject) {
+        this.paySubject = paySubject;
     }
 
     public LocalDateTime getCreatedAt() {

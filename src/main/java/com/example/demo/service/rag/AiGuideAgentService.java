@@ -8,6 +8,7 @@ import com.example.demo.mapper.ShelfMapper;
 import com.example.demo.model.dto.GuideRouteRequestDTO;
 import com.example.demo.model.vo.GuideRouteResponseVO;
 import com.example.demo.model.vo.WaypointVO;
+import com.example.demo.service.rag.tool.EcommerceTools;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatLanguageModel;
@@ -72,38 +73,81 @@ public class AiGuideAgentService {
                 continue;
             }
 
+            Set<String> expandedTerms = EcommerceTools.expandKeywords(cleanWord);
             List<Product> products = productMapper.selectList(new LambdaQueryWrapper<Product>()
                     .eq(Product::getStatus, "ON_SHELF")
-                    .like(Product::getName, cleanWord)
+                    .and(w -> {
+                        boolean first = true;
+                        for (String term : expandedTerms) {
+                            if (!first) {
+                                w.or();
+                            }
+                            w.like(Product::getName, term);
+                            first = false;
+                        }
+                    })
                     .orderByDesc(Product::getStock));
 
             if (products.isEmpty()) {
-                // 按品类或简单分词再次检索
+                // 按品类或描述模糊检索
                 products = productMapper.selectList(new LambdaQueryWrapper<Product>()
                         .eq(Product::getStatus, "ON_SHELF")
-                        .like(Product::getCategory, cleanWord));
+                        .and(w -> {
+                            boolean first = true;
+                            for (String term : expandedTerms) {
+                                if (!first) {
+                                    w.or();
+                                }
+                                w.like(Product::getCategory, term).or().like(Product::getDescription, term);
+                                first = false;
+                            }
+                        })
+                        .orderByDesc(Product::getStock));
             }
 
             // 若仍未命中且词长大于 2，尝试剥离常见修饰词（如“降噪”、“无线”、“红富士”等）或截取末尾核心词根检索
             if (products.isEmpty() && cleanWord.length() > 2) {
                 String stripped = cleanWord.replaceAll("^(降噪|无线|头戴|智能|电竞|客制化|有机|红富士|便携|全脂|台式|游戏)", "");
                 if (!stripped.isBlank() && stripped.length() >= 2) {
+                    Set<String> strippedExpanded = EcommerceTools.expandKeywords(stripped);
                     products = productMapper.selectList(new LambdaQueryWrapper<Product>()
                             .eq(Product::getStatus, "ON_SHELF")
-                            .and(w -> w.like(Product::getName, stripped).or().like(Product::getCategory, stripped))
+                            .and(w -> {
+                                boolean first = true;
+                                for (String term : strippedExpanded) {
+                                    if (!first) {
+                                        w.or();
+                                    }
+                                    w.like(Product::getName, term).or().like(Product::getCategory, term);
+                                    first = false;
+                                }
+                            })
                             .orderByDesc(Product::getStock));
                 }
                 if (products.isEmpty() && cleanWord.length() >= 4) {
+                    String prefix = cleanWord.substring(0, 2);
                     String suffix = cleanWord.substring(cleanWord.length() - 2);
+                    Set<String> partialTerms = new HashSet<>(EcommerceTools.expandKeywords(prefix));
+                    partialTerms.addAll(EcommerceTools.expandKeywords(suffix));
                     products = productMapper.selectList(new LambdaQueryWrapper<Product>()
                             .eq(Product::getStatus, "ON_SHELF")
-                            .and(w -> w.like(Product::getName, suffix).or().like(Product::getCategory, suffix))
+                            .and(w -> {
+                                boolean first = true;
+                                for (String term : partialTerms) {
+                                    if (!first) {
+                                        w.or();
+                                    }
+                                    w.like(Product::getName, term).or().like(Product::getCategory, term);
+                                    first = false;
+                                }
+                            })
                             .orderByDesc(Product::getStock));
                 }
             }
 
             if (!products.isEmpty()) {
-                Product target = products.getFirst();
+                List<Product> ranked = EcommerceTools.rankByRelevance(products, cleanWord, expandedTerms);
+                Product target = ranked.getFirst();
                 if (!matchedProductIds.contains(target.getId())) {
                     matchedProductIds.add(target.getId());
 
@@ -253,7 +297,8 @@ public class AiGuideAgentService {
                 String[] items = response.replaceAll("[，、；;]", ",").split(",");
                 List<String> list = new ArrayList<>();
                 for (String it : items) {
-                    String clean = it.trim().replaceAll("^[0-9一二两三四五六七八九十]+[个盒瓶斤件箱包双条副支把台]?\\s*", "");
+                    // 仅剥离严格跟有中文量词的前缀，防止把“三星”“三模”误删为“星”“模”
+                    String clean = it.trim().replaceAll("^[0-9一二两三四五六七八九十]+[个盒瓶斤件箱包双条副支把台部颗杯]\\s*", "");
                     if (!clean.isBlank() && clean.length() >= 2) {
                         list.add(clean);
                     }
@@ -266,8 +311,10 @@ public class AiGuideAgentService {
             log.warn("大模型解析购物清单异常或处于测试环境，切换为本地分词提取兜底: {}", e.getMessage());
         }
 
-        // 本地规则分词兜底
-        String sanitized = text.replaceAll("[我想买来点需要要一二两三四五六七八九十个盒瓶斤件箱包双条副支把台以及还要并和，、。？！?!]", " ");
+        // 本地规则分词兜底：先剔除带量词的数字前缀（保护“三星”“三模”等品牌与型号词），再按连接词与标点拆分
+        String sanitized = text
+                .replaceAll("[0-9一二两三四五六七八九十]+[个盒瓶斤件箱包双条副支把台部颗杯]", " ")
+                .replaceAll("(我想买|想买|帮我找|我要|来点|需要|以及|还要|[，、。？！?!和与])", " ");
         String[] words = sanitized.split("\\s+");
         List<String> result = new ArrayList<>();
         for (String w : words) {

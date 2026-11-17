@@ -58,7 +58,7 @@ public class RagConfig {
                 .baseUrl(llmBaseUrl)
                 .apiKey(llmApiKey)
                 .modelName(llmModelName)
-                .timeout(Duration.ofSeconds(60))
+                .timeout(Duration.ofSeconds(12))
                 .build();
     }
 

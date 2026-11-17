@@ -8,6 +8,7 @@ import com.example.demo.security.UserPrincipal;
 import com.example.demo.service.OrderService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,5 +47,25 @@ public class OrderController {
                                                 @RequestParam(defaultValue = "10") int size) {
         Page<OrderVO> orderPage = orderService.listUserOrders(userPrincipal.getUserId(), page, size);
         return Result.success(orderPage);
+    }
+
+    /**
+     * 根据订单编号查询订单详情 (含支付宝沙箱支付状态与交易流水号)
+     */
+    @GetMapping("/{orderNo}")
+    public Result<OrderVO> getOrderDetail(@AuthenticationPrincipal UserPrincipal userPrincipal,
+                                          @PathVariable String orderNo) {
+        OrderVO orderVO = orderService.getOrderByNo(userPrincipal.getUserId(), orderNo);
+        return Result.success(orderVO);
+    }
+
+    /**
+     * 取消待支付订单并原子回滚库存
+     */
+    @PostMapping("/{orderNo}/cancel")
+    public Result<OrderVO> cancelOrder(@AuthenticationPrincipal UserPrincipal userPrincipal,
+                                       @PathVariable String orderNo) {
+        OrderVO orderVO = orderService.cancelOrder(userPrincipal.getUserId(), orderNo);
+        return Result.success(orderVO);
     }
 }

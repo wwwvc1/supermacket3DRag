@@ -1,0 +1,12 @@
+# 仅用于本目录下的独立示例，不要装进 dianshanRag 的 Java 工程。
+# 安装：python -m venv .venv && .venv\Scripts\activate && pip install -r requirements.txt
+# 启动：uvicorn main:app --reload --port 8000
+
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+sqlalchemy==2.0.36
+pymysql==1.1.1
+pyjwt==2.10.1
+passlib[bcrypt]==1.7.4
+pydantic-settings==2.7.0
+email-validator==2.2.0

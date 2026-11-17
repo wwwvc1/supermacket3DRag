@@ -58,6 +58,31 @@ public class Product implements Serializable {
     private String description;
 
     /**
+     * 商品正面展示图片路径 (静态资源 /products/... 或外部 URL)
+     */
+    private String imageUrl;
+
+    /**
+     * 商品背面展示图片路径 (360° 翻转展示使用)
+     */
+    private String backImageUrl;
+
+    /**
+     * 商品侧面展示图片路径 (悬架滑轨侧挂图使用)
+     */
+    private String sideImageUrl;
+
+    /**
+     * 所属 3D 旗舰展厅分类: STAGE_RAIL (高定服饰), STAGE_TECH (数码转盘), STAGE_VITRINE (典藏展柜), STORE_GENERAL (通用货架)
+     */
+    private String showroomStage;
+
+    /**
+     * 展厅主视觉主题色 (#HEX)
+     */
+    private String colorHex;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createdAt;
@@ -149,6 +174,46 @@ public class Product implements Serializable {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
+    }
+
+    public String getBackImageUrl() {
+        return backImageUrl;
+    }
+
+    public void setBackImageUrl(String backImageUrl) {
+        this.backImageUrl = backImageUrl;
+    }
+
+    public String getSideImageUrl() {
+        return sideImageUrl;
+    }
+
+    public void setSideImageUrl(String sideImageUrl) {
+        this.sideImageUrl = sideImageUrl;
+    }
+
+    public String getShowroomStage() {
+        return showroomStage;
+    }
+
+    public void setShowroomStage(String showroomStage) {
+        this.showroomStage = showroomStage;
+    }
+
+    public String getColorHex() {
+        return colorHex;
+    }
+
+    public void setColorHex(String colorHex) {
+        this.colorHex = colorHex;
     }
 
     public LocalDateTime getCreatedAt() {

@@ -53,7 +53,8 @@ public class SupermarketEventPublisher {
         }
 
         int currentStock = latestStock != null ? latestStock : (product.getStock() != null ? product.getStock() : 0);
-        boolean isOutOfStock = currentStock <= 0;
+        boolean isOffShelf = "OFF_SHELF".equalsIgnoreCase(product.getStatus());
+        boolean isOutOfStock = currentStock <= 0 || isOffShelf;
 
         Shelf shelf = null;
         if (product.getShelfId() != null) {

@@ -21,4 +21,14 @@ public interface ProductMapper extends BaseMapper<Product> {
      */
     @Update("UPDATE product SET stock = stock - #{quantity}, updated_at = CURRENT_TIMESTAMP WHERE id = #{productId} AND stock >= #{quantity}")
     int deductStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
+
+    /**
+     * 取消订单或退款回滚商品库存 (原子增补)
+     *
+     * @param productId 商品主键 ID
+     * @param quantity  回滚数量
+     * @return 影响行数
+     */
+    @Update("UPDATE product SET stock = stock + #{quantity}, updated_at = CURRENT_TIMESTAMP WHERE id = #{productId}")
+    int restoreStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
 }
