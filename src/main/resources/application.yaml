@@ -42,7 +42,7 @@ rag:
   llm:
     provider: openai-compatible
     base-url: "https://apihub.agnes-ai.com/v1"
-    api-key: "sk-IBcUKzTJUuTKAQRZaiAahs51YrfK4r7KBc3AYeCkft8xlHDr"
+    api-key: "${RAG_LLM_API_KEY:your-api-key}"
     model-name: "agnes-3.0-flash"
   embedding:
     # 动态切换: local (纯 Java 进程内 ONNX BGE-Small-ZH) 或 online (OpenAI 兼容接口)
